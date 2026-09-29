@@ -1,0 +1,41 @@
+# Render Blueprint — a one-click free deploy of the FastAPI backend.
+#
+# Setup (no local tools, no credit card):
+#   1. Sign up at https://render.com with GitHub (free).
+#   2. Dashboard -> New -> Blueprint -> select the Eye-of-Horus repo.
+#   3. Render reads this file automatically and shows the plan below.
+#      Click "Apply" — that's it.
+#
+# The free plan spins the service down after ~15 minutes idle and wakes it
+# on the next request (cold start up to ~30s). The filesystem is ephemeral,
+# so the SQLite demo database resets on every redeploy/restart — harmless
+# here since the app reseeds its own demo data on startup.
+services:
+  - type: web
+    name: eye-of-horus-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ENVIRONMENT
+        value: production
+      - key: DATA_MODE
+        value: demo
+      - key: MARKET_DATA_PROVIDER
+        value: demo
+      - key: LIVE_TRADING_ENABLED
+        value: "false"
+      - key: DEFAULT_PAPER_CAPITAL
+        value: "10000"
+      - key: INGESTION_INTERVAL_SECONDS
+        value: "300"
+      # The deployed GitHub Pages origin — update if you fork/rename the repo.
+      - key: CORS_ORIGINS
+        value: '["https://nikros07.github.io"]'

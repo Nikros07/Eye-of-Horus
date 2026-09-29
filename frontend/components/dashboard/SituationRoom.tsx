@@ -12,8 +12,12 @@ export default function SituationRoom({ events }: { events: EventSummary[] }) {
           <AlertTicker />
         </aside>
 
-        <div className="order-1 h-[420px] overflow-hidden rounded-2xl border border-white/[0.06] bg-black/40 lg:order-2 lg:h-[640px]">
+        <div className="relative order-1 h-[420px] overflow-hidden rounded-2xl border border-white/[0.06] bg-black/40 lg:order-2 lg:h-[640px]">
           <GlobalGlobe events={events} className="h-full w-full cursor-grab active:cursor-grabbing" />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_0_140px_60px_rgba(0,0,0,0.55)]"
+          />
         </div>
       </div>
     </section>
