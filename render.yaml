@@ -4,12 +4,15 @@
 #   1. Sign up at https://render.com with GitHub (free).
 #   2. Dashboard -> New -> Blueprint -> select the Eye-of-Horus repo.
 #   3. Render reads this file automatically and shows the plan below.
-#      Click "Apply" — that's it.
+#      Click "Apply" — that's it. No env vars need to be filled in; every
+#      one below already has a value that makes the app run in demo mode,
+#      which needs no API keys or paid services.
 #
 # The free plan spins the service down after ~15 minutes idle and wakes it
 # on the next request (cold start up to ~30s). The filesystem is ephemeral,
 # so the SQLite demo database resets on every redeploy/restart — harmless
-# here since the app reseeds its own demo data on startup.
+# here since the app reseeds its own demo data on startup (see
+# backend/app/services/bootstrap.py).
 services:
   - type: web
     name: eye-of-horus-api
@@ -26,16 +29,32 @@ services:
         value: "3.11.9"
       - key: ENVIRONMENT
         value: production
+      # demo = deterministic seeded generators, no external calls, no keys.
       - key: DATA_MODE
         value: demo
       - key: MARKET_DATA_PROVIDER
         value: demo
+      # Leave false. Live trading additionally requires a real broker
+      # adapter that does not exist yet — see backend/.env.example.
       - key: LIVE_TRADING_ENABLED
         value: "false"
       - key: DEFAULT_PAPER_CAPITAL
         value: "10000"
       - key: INGESTION_INTERVAL_SECONDS
         value: "300"
-      # The deployed GitHub Pages origin — update if you fork/rename the repo.
+      # The deployed GitHub Pages origin — update if you fork/rename the
+      # repo, or add your own frontend's origin here (comma-separated
+      # entries inside the JSON list below, e.g. also
+      # "http://localhost:3000" while developing against this backend).
       - key: CORS_ORIGINS
         value: '["https://nikros07.github.io"]'
+      # Optional. Leave unset (click "Skip" when prompted) to keep the
+      # deterministic evidence synthesizer — the research layer works
+      # fully without this. Set it only if you want the AI research layer
+      # to call the real Claude API instead.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # DATABASE_URL is intentionally not set here: it defaults to the
+      # bundled SQLite file, which is all the free plan's ephemeral disk
+      # needs. Add DATABASE_URL (pointing at a managed Postgres instance)
+      # only if you want data to persist across restarts/redeploys.
