@@ -56,3 +56,23 @@ def test_close_position_realizes_pnl(db_session):
     assert close_order is not None
     assert close_order.status == "filled"
     assert broker.get_positions() == []
+
+
+def test_two_buys_in_the_same_uncommitted_session_accumulate_into_one_position(db_session):
+    """Regression test: PaperBroker used to attach new Position/Trade rows to
+    the portfolio via `portfolio_id=` alone, which never updates the
+    in-memory `portfolio.positions`/`portfolio.trades` collections. Two
+    signals for the same asset in one auto-trade cycle (no commit between
+    them) would each see zero existing positions and each open a separate
+    Position row instead of accumulating into one — and risk checks reading
+    `portfolio.trades` (cooldown, max_trades_per_day, daily_pnl) would stay
+    blind to trades placed earlier in the same cycle."""
+    portfolio, broker = _setup(db_session)
+
+    broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=10))
+    broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=5))
+
+    assert len(portfolio.trades) == 2
+    positions = broker.get_positions()
+    assert len(positions) == 1
+    assert positions[0].qty == 15

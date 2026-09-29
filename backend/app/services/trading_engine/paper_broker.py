@@ -103,6 +103,12 @@ class PaperBroker(BrokerAdapter):
         fill_price = mid * (1 + ((SPREAD_BPS + SLIPPAGE_BPS) / 10_000) * sign)
         fees = request.qty * fill_price * (FEE_BPS / 10_000)
 
+        # `existing` is read from the in-memory `self.portfolio.positions`
+        # collection, not a fresh query — so a position opened earlier in the
+        # same uncommitted session (e.g. an earlier signal in the same
+        # auto-trade cycle) is only visible here if it was attached via the
+        # `portfolio=` relationship below, not just a `portfolio_id` column
+        # value. The same applies to `self.portfolio.trades` in risk_engine.
         existing = next((p for p in self.portfolio.positions if p.asset_id == asset.id and p.closed_at is None), None)
 
         if request.side == "buy":
@@ -112,7 +118,7 @@ class PaperBroker(BrokerAdapter):
             self.portfolio.cash -= cost
             if existing is None:
                 existing = Position(
-                    portfolio_id=self.portfolio.id,
+                    portfolio=self.portfolio,
                     asset_id=asset.id,
                     side="long",
                     qty=request.qty,
@@ -138,7 +144,7 @@ class PaperBroker(BrokerAdapter):
                 existing.closed_at = _now()
 
         trade = Trade(
-            portfolio_id=self.portfolio.id,
+            portfolio=self.portfolio,
             asset_id=asset.id,
             side=request.side,
             qty=request.qty,
