@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_main_portfolio
 from app.core.db import get_db
-from app.models.trading import Portfolio
 from app.services.market_engine.factory import get_market_source
 from app.services.trading_engine.risk_engine import (
     activate_kill_switch,
@@ -16,13 +16,6 @@ from app.services.trading_engine.risk_engine import (
 )
 
 router = APIRouter()
-
-
-def _get_portfolio(db: Session) -> Portfolio:
-    portfolio = db.query(Portfolio).filter(Portfolio.name == "Main Portfolio").one_or_none()
-    if portfolio is None:
-        raise HTTPException(404, "No portfolio found")
-    return portfolio
 
 
 class RiskLimitUpdate(BaseModel):
@@ -36,10 +29,10 @@ class RiskLimitUpdate(BaseModel):
 
 @router.get("")
 def get_risk_snapshot(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     config = get_or_create_risk_config(db, portfolio)
     market_source = get_market_source()
-    price_lookup = lambda sym: market_source.get_quote(sym).price  # noqa: E731
+    price_lookup = market_source.get_price
 
     equity = portfolio_equity(db, portfolio, price_lookup)
     open_positions = [p for p in portfolio.positions if p.closed_at is None]
@@ -74,7 +67,7 @@ def get_risk_snapshot(db: Session = Depends(get_db)):
 
 @router.put("")
 def update_risk_limits(req: RiskLimitUpdate, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     config = get_or_create_risk_config(db, portfolio)
     for field, value in req.model_dump(exclude_none=True).items():
         setattr(config, field, value)
@@ -84,7 +77,7 @@ def update_risk_limits(req: RiskLimitUpdate, db: Session = Depends(get_db)):
 
 @router.post("/kill-switch")
 def set_kill_switch(active: bool, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     if active:
         activate_kill_switch(db, portfolio)
     else:
