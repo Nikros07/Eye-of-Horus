@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from app.models.event import Event
+from app.models.system import DataSource
+from app.services.event_engine.connectors.base import RawEvent, RawEvidence
 from app.services.event_engine.connectors.demo_connector import DemoEventConnector
+from app.services.event_engine.connectors.nasa_eonet import NasaEonetConnector
+from app.services.event_engine.connectors.open_meteo import OpenMeteoConnector
 from app.services.event_engine.normalizer import upsert_event
 from app.services.event_engine.verification import score_verification
 
@@ -47,3 +53,46 @@ def test_score_verification_flags_unverified_with_no_evidence():
     status, confidence = score_verification(FakeEvent(), [])
     assert status == "unverified"
     assert confidence == 0.38
+
+
+def test_live_ingestion_corroborates_weather_sensitive_events_with_open_meteo(db_session, monkeypatch):
+    """Regression test: config.py documents that DATA_MODE=live calls NASA
+    EONET AND Open-Meteo, but OpenMeteoConnector was never actually wired
+    into the live ingestion path. A weather-sensitive event should come out
+    with Open-Meteo evidence attached; an event type Open-Meteo can't
+    corroborate should not trigger a call at all."""
+    import app.services.event_engine.ingest as ingest_module
+
+    now = datetime.now(timezone.utc)
+    raw_flood = RawEvent(
+        source_event_id="EONET-1", event_type="flood", title="Flood", timestamp=now,
+        lat=10.0, lon=20.0, source="NASA_EONET", publication_time=now,
+    )
+    raw_earthquake = RawEvent(
+        source_event_id="EONET-2", event_type="earthquake", title="Earthquake", timestamp=now,
+        lat=30.0, lon=40.0, source="NASA_EONET", publication_time=now,
+    )
+
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: type("S", (), {"data_mode": "live"})())
+    monkeypatch.setattr(NasaEonetConnector, "fetch", lambda self, since=None: [raw_flood, raw_earthquake])
+
+    calls: list[tuple[float, float]] = []
+
+    def fake_fetch_current(self, lat: float, lon: float) -> RawEvidence:
+        calls.append((lat, lon))
+        return RawEvidence(kind="weather", source="OPEN_METEO", content="synthetic", availability_time=now)
+
+    monkeypatch.setattr(OpenMeteoConnector, "fetch_current", fake_fetch_current)
+
+    events = ingest_module.run_event_ingestion(db_session)
+    db_session.commit()
+
+    assert calls == [(10.0, 20.0)]  # only the weather-sensitive event triggered a call
+    by_type = {e.event_type: e for e in events}
+    assert len(by_type["flood"].evidence) == 1
+    assert by_type["flood"].evidence[0].kind == "weather"
+    assert len(by_type["earthquake"].evidence) == 0
+
+    meteo_source = db_session.query(DataSource).filter(DataSource.name == "OPEN_METEO").one()
+    assert meteo_source.status == "online"
+    assert meteo_source.is_demo is False
