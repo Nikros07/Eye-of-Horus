@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: eye_of_horus
+      POSTGRES_PASSWORD: eye_of_horus
+      POSTGRES_DB: eye_of_horus
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eye_of_horus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Not used by anything yet — reserved for the Celery/RQ upgrade path
+  # mentioned in backend/app/workers/scheduler.py once ingestion volume
+  # ever outgrows the in-process APScheduler.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://eye_of_horus:eye_of_horus@postgres:5432/eye_of_horus
+      DATA_MODE: demo
+      ENVIRONMENT: production
+      LIVE_TRADING_ENABLED: "false"
+      MARKET_DATA_PROVIDER: demo
+      CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
