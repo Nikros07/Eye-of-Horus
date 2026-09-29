@@ -19,7 +19,7 @@ export default function BacktestLabPage() {
   const [days, setDays] = useState("30");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
-  const [compareResults, setCompareResults] = useState<any[] | null>(null);
+  const [compareResults, setCompareResults] = useState<BacktestResult[] | null>(null);
 
   async function runBacktest() {
     setRunning(true);

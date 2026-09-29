@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import clsx from "clsx";
 import { api } from "@/lib/api";
-import { relativeTime } from "@/lib/format";
+import { formatCompactCurrency, formatPercent, formatRatio, relativeTime } from "@/lib/format";
 
 const statusStyle: Record<string, string> = {
   online: "border-gold/40 bg-gold/10 text-gold-bright",
@@ -76,6 +76,79 @@ export default function SystemPage() {
         <div className="rounded-xl border border-border glass p-4">
           <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Market Provider</div>
           <div className="mono-num mt-1.5 text-[20px] font-semibold text-text-primary">{status?.market_data_provider ?? "—"}</div>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="mb-4 text-[12px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+          Risk Management
+        </h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-border glass p-5 lg:col-span-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">Current Exposure</div>
+            <div className="mt-3 grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Exposure</div>
+                <div className="mono-num mt-1 text-[16px] font-semibold text-text-primary">
+                  {risk ? formatRatio(risk.current.exposure_pct) : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Drawdown</div>
+                <div className="mono-num mt-1 text-[16px] font-semibold text-danger-bright">
+                  {risk ? formatPercent(-risk.current.current_drawdown_pct, 1) : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Daily P&amp;L</div>
+                <div
+                  className={clsx(
+                    "mono-num mt-1 text-[16px] font-semibold",
+                    (risk?.current.daily_pnl ?? 0) >= 0 ? "text-gold-bright" : "text-danger-bright"
+                  )}
+                >
+                  {risk ? formatCompactCurrency(risk.current.daily_pnl) : "—"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 border-t border-border pt-4">
+              <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Position Concentration</div>
+              <div className="mt-2.5 space-y-2">
+                {Object.entries(risk?.current.position_concentration || {}).map(([symbol, pct]) => (
+                  <div key={symbol} className="flex items-center gap-3 text-[12px]">
+                    <span className="w-16 shrink-0 font-semibold text-text-primary">{symbol}</span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div className="h-full rounded-full bg-gold" style={{ width: `${Math.min(pct * 100, 100)}%` }} />
+                    </div>
+                    <span className="mono-num w-12 shrink-0 text-right text-text-tertiary">{formatRatio(pct, 0)}</span>
+                  </div>
+                ))}
+                {(!risk || Object.keys(risk.current.position_concentration).length === 0) && (
+                  <p className="text-[12px] text-text-tertiary">No open exposure.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border glass p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">Configured Limits</div>
+            <div className="mt-3 space-y-2 text-[12px]">
+              {[
+                ["Max position size", risk ? formatRatio(risk.limits.max_position_size_pct, 0) : "—"],
+                ["Max daily loss", risk ? formatRatio(risk.limits.max_daily_loss_pct, 0) : "—"],
+                ["Max portfolio exposure", risk ? formatRatio(risk.limits.max_portfolio_exposure_pct, 0) : "—"],
+                ["Max trades / day", risk ? String(risk.limits.max_trades_per_day) : "—"],
+                ["Max drawdown", risk ? formatRatio(risk.limits.max_drawdown_pct, 0) : "—"],
+                ["Cooldown", risk ? `${risk.limits.cooldown_seconds}s` : "—"],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between border-b border-border/60 pb-2 last:border-0 last:pb-0">
+                  <span className="text-text-tertiary">{label}</span>
+                  <span className="mono-num font-semibold text-text-primary">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
