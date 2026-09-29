@@ -55,6 +55,7 @@ def list_alerts(
                 "signal_id": s.signal_id,
                 "severity": alert_severity,
                 "asset_symbol": s.asset.symbol,
+                "event_id": s.event.event_id if s.event else None,
                 "event_type": s.event.event_type if s.event else None,
                 "event_title": s.event.title if s.event else None,
                 "direction": s.direction,

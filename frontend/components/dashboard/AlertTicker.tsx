@@ -1,0 +1,78 @@
+"use client";
+
+import useSWR from "swr";
+import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
+import { api } from "@/lib/api";
+import { relativeTime, titleCase } from "@/lib/format";
+
+const severityDot: Record<string, string> = {
+  critical: "bg-danger-bright shadow-[0_0_10px_2px_rgba(241,113,120,0.6)]",
+  high: "bg-gold-bright shadow-[0_0_10px_2px_rgba(234,203,140,0.5)]",
+  medium: "bg-info-bright shadow-[0_0_8px_1px_rgba(130,170,245,0.4)]",
+  low: "bg-text-tertiary",
+};
+
+export default function AlertTicker() {
+  const { data: alerts } = useSWR("hero-alerts", () => api.alerts({ limit: 14, hours: 168 }), {
+    refreshInterval: 12000,
+  });
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 px-1 pb-4">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-danger-bright opacity-60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-danger-bright" />
+        </span>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-text-secondary">Live Alerts</h2>
+        <span className="ml-auto font-mono text-[10px] text-text-faint">{alerts?.length ?? 0}</span>
+      </div>
+
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
+        <AnimatePresence initial={false}>
+          {(alerts || []).map((a) => (
+            <motion.div
+              key={a.signal_id}
+              layout
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Link
+                href={`/events?id=${a.event_id ?? ""}`}
+                className="block rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 transition-colors hover:border-white/[0.14] hover:bg-white/[0.04]"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${severityDot[a.severity]}`} />
+                  <span className="truncate text-[12.5px] font-semibold text-text-primary">{a.asset_symbol}</span>
+                  <span
+                    className={`ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide ${
+                      a.direction === "bullish" ? "text-gold-bright" : "text-danger-bright"
+                    }`}
+                  >
+                    {a.direction}
+                  </span>
+                </div>
+                <p className="mt-1.5 line-clamp-1 text-[11.5px] leading-snug text-text-tertiary">
+                  {a.event_title || titleCase(a.event_type || "")}
+                </p>
+                <div className="mt-1.5 flex items-center justify-between text-[10px] text-text-faint">
+                  <span>{Math.round(a.confidence * 100)}% confidence</span>
+                  <span>{relativeTime(a.signal_time)}</span>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {(!alerts || alerts.length === 0) && (
+          <div className="rounded-xl border border-dashed border-white/[0.08] px-3.5 py-8 text-center text-[11.5px] text-text-faint">
+            Monitoring for signals…
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

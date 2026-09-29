@@ -79,6 +79,12 @@ export const api = {
   tradingMode: () => request<{ mode: string; live_trading_enabled: boolean }>("/api/trading/mode"),
   setTradingMode: (mode: string) =>
     request<{ mode: string }>("/api/trading/mode", { method: "POST", body: JSON.stringify({ mode }) }),
+  autoTrade: () => request<{ enabled: boolean; min_confidence: number }>("/api/trading/auto-trade"),
+  setAutoTrade: (enabled: boolean, min_confidence?: number) =>
+    request<{ enabled: boolean; min_confidence: number }>("/api/trading/auto-trade", {
+      method: "POST",
+      body: JSON.stringify({ enabled, min_confidence }),
+    }),
   account: () => request<{ cash: number; equity: number; buying_power: number; mode: string }>("/api/trading/account"),
   positions: () => request<import("./types").Position[]>("/api/trading/positions"),
   orders: () => request<any[]>("/api/trading/orders"),

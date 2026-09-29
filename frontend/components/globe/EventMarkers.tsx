@@ -85,7 +85,7 @@ function Marker({ event, radius }: { event: EventSummary; radius: number }) {
       <mesh
         onClick={(e) => {
           e.stopPropagation();
-          router.push(`/events/${event.event_id}`);
+          router.push(`/events?id=${event.event_id}`);
         }}
         onPointerOver={(e) => {
           e.stopPropagation();

@@ -9,7 +9,7 @@ import MarketCard from "@/components/cards/MarketCard";
 import EventCard from "@/components/cards/EventCard";
 import SignalBadge from "@/components/cards/SignalBadge";
 import PositionCard from "@/components/cards/PositionCard";
-import GlobalGlobe from "@/components/globe/GlobalGlobe";
+import SituationRoom from "@/components/dashboard/SituationRoom";
 import DemoDataBadge from "@/components/common/DemoDataBadge";
 import { formatCompactCurrency, relativeTime, titleCase } from "@/lib/format";
 
@@ -36,12 +36,14 @@ export default function DashboardPage() {
   const featuredAssets = (assets || []).slice(0, 6);
 
   return (
-    <div className="mx-auto max-w-[1600px] px-6 pb-24 pt-8">
-      {/* HERO */}
+    <div className="mx-auto max-w-[1600px] px-6 pb-24 pt-6">
+      <SituationRoom events={events || []} />
+
+      {/* HERO TEXT */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className="mb-8"
       >
         <div className="flex items-center gap-3">
@@ -54,38 +56,29 @@ export default function DashboardPage() {
         </p>
       </motion.div>
 
-      {/* PORTFOLIO + GLOBE */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-        <div className="lg:col-span-2 space-y-5">
-          {portfolio && <PortfolioCard portfolio={portfolio} />}
+      {/* PORTFOLIO + SYSTEM INTELLIGENCE */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">{portfolio && <PortfolioCard portfolio={portfolio} />}</div>
 
-          <div className="rounded-2xl border border-border glass p-5">
-            <SectionLabel>System Intelligence</SectionLabel>
-            <div className="space-y-2.5">
-              {(status?.data_sources || []).map((s) => (
-                <div key={s.name} className="flex items-center justify-between text-[12px]">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        s.status === "online" ? "bg-gold" : s.status === "degraded" ? "bg-info" : "bg-danger"
-                      }`}
-                    />
-                    <span className="text-text-secondary">{s.name.replace(/_/g, " ")}</span>
-                  </div>
-                  <span className="mono-num text-text-tertiary">
-                    {s.status.toUpperCase()} {s.latency_ms ? `· ${Math.round(s.latency_ms)}ms` : ""}
-                  </span>
+        <div className="rounded-2xl border border-border glass p-5">
+          <SectionLabel>System Intelligence</SectionLabel>
+          <div className="space-y-2.5">
+            {(status?.data_sources || []).map((s) => (
+              <div key={s.name} className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      s.status === "online" ? "bg-gold" : s.status === "degraded" ? "bg-info" : "bg-danger"
+                    }`}
+                  />
+                  <span className="text-text-secondary">{s.name.replace(/_/g, " ")}</span>
                 </div>
-              ))}
-            </div>
+                <span className="mono-num text-text-tertiary">
+                  {s.status.toUpperCase()} {s.latency_ms ? `· ${Math.round(s.latency_ms)}ms` : ""}
+                </span>
+              </div>
+            ))}
           </div>
-        </div>
-
-        <div className="lg:col-span-3 overflow-hidden rounded-2xl border border-border glass">
-          <div className="flex items-center justify-between px-5 pt-5">
-            <SectionLabel>Global Event Map</SectionLabel>
-          </div>
-          <GlobalGlobe events={events || []} className="h-[560px] w-full cursor-grab active:cursor-grabbing" />
         </div>
       </div>
 
