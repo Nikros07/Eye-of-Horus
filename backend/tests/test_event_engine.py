@@ -22,6 +22,40 @@ def test_demo_connector_produces_events_with_provenance():
         assert e.publication_time is not None
 
 
+def test_corroborating_evidence_is_deterministic_across_processes():
+    """Regression test: fetch_corroborating_evidence used Python's builtin
+    hash() on a string to seed its RNG, which is randomized per-process
+    (PYTHONHASHSEED) and so silently broke the "deterministic ... for tests
+    and for the backtester" guarantee the module promises. Runs the same
+    generation in two subprocesses with different hash seeds and checks
+    their output is byte-for-byte identical."""
+    import os
+    import subprocess
+    import sys
+
+    script = (
+        "from app.services.event_engine.connectors.demo_connector import DemoEventConnector\n"
+        "from datetime import datetime, timezone\n"
+        "c = DemoEventConnector(now=datetime(2026, 1, 1, tzinfo=timezone.utc))\n"
+        "raw = c.fetch()[0]\n"
+        "for e in c.fetch_corroborating_evidence(raw):\n"
+        "    print(e.content)\n"
+    )
+
+    def run_with_hash_seed(seed: str) -> str:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, check=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        )
+        return result.stdout
+
+    output_seed_1 = run_with_hash_seed("1")
+    output_seed_2 = run_with_hash_seed("2")
+    assert output_seed_1 == output_seed_2
+    assert output_seed_1.strip() != ""
+
+
 def test_upsert_event_dedupes_by_source_and_source_event_id(db_session):
     connector = DemoEventConnector()
     raw = connector.fetch()[0]

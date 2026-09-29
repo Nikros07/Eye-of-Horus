@@ -10,6 +10,7 @@ backtester.
 from __future__ import annotations
 
 import random
+import zlib
 from datetime import datetime, timedelta, timezone
 
 from app.services.event_engine.connectors.base import EventConnector, RawEvent, RawEvidence
@@ -73,8 +74,13 @@ class DemoEventConnector(EventConnector):
         return events
 
     def fetch_corroborating_evidence(self, raw_event: RawEvent) -> list[RawEvidence]:
-        """Deterministic secondary-source + weather evidence for demo events."""
-        rng = random.Random(_SEED + hash(raw_event.source_event_id) % 1000)
+        """Deterministic secondary-source + weather evidence for demo events.
+
+        Seeds from crc32, not the builtin hash(): str hashing is randomized
+        per-process (PYTHONHASHSEED), which would make this "deterministic"
+        generator produce different evidence on every restart."""
+        source_id_seed = zlib.crc32(raw_event.source_event_id.encode()) % 1000
+        rng = random.Random(_SEED + source_id_seed)
         items: list[RawEvidence] = []
 
         items.append(
