@@ -12,9 +12,10 @@ from sqlalchemy.orm import Session
 from app.models.signal import Signal
 from app.models.trading import Portfolio
 from app.services.market_engine.factory import get_market_source
+from app.services.signal_engine.strategy_base import confidence_scaled_notional
 from app.services.trading_engine.broker_base import BrokerAdapter, OrderInfo, OrderRequest
 from app.services.trading_engine.paper_broker import PaperBroker
-from app.services.trading_engine.risk_engine import check_order, get_or_create_risk_config
+from app.services.trading_engine.risk_engine import check_order, get_or_create_risk_config, portfolio_equity
 
 
 @dataclass
@@ -38,14 +39,12 @@ def execute_signal(db: Session, portfolio: Portfolio, signal: Signal, override_n
         return TradeDecision(False, "Portfolio is in RESEARCH mode — analysis only, no orders are ever placed.", None)
 
     market_source = get_market_source()
-    price_lookup = lambda sym: market_source.get_quote(sym).price  # noqa: E731
+    price_lookup = market_source.get_price
     current_price = price_lookup(signal.asset.symbol)
 
     config = get_or_create_risk_config(db, portfolio)
-    from app.services.trading_engine.risk_engine import portfolio_equity
-
     equity = portfolio_equity(db, portfolio, price_lookup)
-    notional = override_notional or (equity * config.max_position_size_pct * max(signal.confidence, 0.0))
+    notional = override_notional or confidence_scaled_notional(signal.confidence, equity, config.max_position_size_pct)
 
     check = check_order(db, portfolio, signal.asset.symbol, "buy" if signal.direction == "bullish" else "sell", notional, current_price, price_lookup)
     if not check.approved:

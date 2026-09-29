@@ -73,6 +73,27 @@ def test_system_status_reports_demo_sources(api_client):
     assert all(s["is_demo"] for s in body["data_sources"])
 
 
+def test_manual_order_rejects_non_positive_qty(api_client):
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": -10})
+    assert resp.status_code == 422
+
+
+def test_risk_limit_update_rejects_a_negative_daily_loss_pct(api_client):
+    """Regression test: a negative max_daily_loss_pct makes
+    risk_engine.check_order's daily-loss guard unsatisfiable (abs(pnl) is
+    never >= a negative bound), silently disabling it — must be rejected
+    at the API boundary instead of silently accepted."""
+    resp = api_client.put("/api/risk", json={"max_daily_loss_pct": -1})
+    assert resp.status_code == 422
+
+
+def test_risk_limit_update_accepts_a_valid_change(api_client):
+    resp = api_client.put("/api/risk", json={"max_position_size_pct": 0.25})
+    assert resp.status_code == 200
+    snapshot = api_client.get("/api/risk").json()
+    assert snapshot["limits"]["max_position_size_pct"] == 0.25
+
+
 def test_research_endpoint_never_fabricates_beyond_insufficient_evidence(api_client):
     events = api_client.get("/api/events").json()
     resp = api_client.get(f"/api/research/events/{events[0]['event_id']}")

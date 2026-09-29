@@ -1,49 +1,47 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_main_portfolio
 from app.core.db import get_db
-from app.models.trading import Portfolio
 from app.services.market_engine.factory import get_market_source
 from app.services.trading_engine.risk_engine import (
     activate_kill_switch,
     daily_pnl,
     deactivate_kill_switch,
     get_or_create_risk_config,
+    open_exposure,
+    open_positions,
     portfolio_equity,
 )
 
 router = APIRouter()
 
 
-def _get_portfolio(db: Session) -> Portfolio:
-    portfolio = db.query(Portfolio).filter(Portfolio.name == "Main Portfolio").one_or_none()
-    if portfolio is None:
-        raise HTTPException(404, "No portfolio found")
-    return portfolio
-
-
 class RiskLimitUpdate(BaseModel):
-    max_position_size_pct: float | None = None
-    max_daily_loss_pct: float | None = None
-    max_portfolio_exposure_pct: float | None = None
-    max_trades_per_day: int | None = None
-    max_drawdown_pct: float | None = None
-    cooldown_seconds: int | None = None
+    # Bounded so a limit can never be set to a value that silently defeats
+    # its own check (e.g. a negative max_daily_loss_pct makes the daily-loss
+    # guard in risk_engine.check_order unsatisfiable, disabling it outright).
+    max_position_size_pct: float | None = Field(default=None, gt=0, le=1)
+    max_daily_loss_pct: float | None = Field(default=None, gt=0, le=1)
+    max_portfolio_exposure_pct: float | None = Field(default=None, gt=0, le=1)
+    max_trades_per_day: int | None = Field(default=None, ge=1)
+    max_drawdown_pct: float | None = Field(default=None, gt=0, le=1)
+    cooldown_seconds: int | None = Field(default=None, ge=0)
 
 
 @router.get("")
 def get_risk_snapshot(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     config = get_or_create_risk_config(db, portfolio)
     market_source = get_market_source()
-    price_lookup = lambda sym: market_source.get_quote(sym).price  # noqa: E731
+    price_lookup = market_source.get_price
 
     equity = portfolio_equity(db, portfolio, price_lookup)
-    open_positions = [p for p in portfolio.positions if p.closed_at is None]
-    exposure = sum(p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price) for p in open_positions)
+    positions = open_positions(portfolio)
+    exposure = open_exposure(portfolio, price_lookup)
     drawdown = (portfolio.initial_capital - equity) / portfolio.initial_capital if portfolio.initial_capital else 0.0
 
     return {
@@ -64,7 +62,7 @@ def get_risk_snapshot(db: Session = Depends(get_db)):
             "daily_pnl": round(daily_pnl(db, portfolio), 2),
             "position_concentration": {
                 p.asset.symbol: round((p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price)) / exposure, 4)
-                for p in open_positions
+                for p in positions
             }
             if exposure
             else {},
@@ -74,7 +72,7 @@ def get_risk_snapshot(db: Session = Depends(get_db)):
 
 @router.put("")
 def update_risk_limits(req: RiskLimitUpdate, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     config = get_or_create_risk_config(db, portfolio)
     for field, value in req.model_dump(exclude_none=True).items():
         setattr(config, field, value)
@@ -84,7 +82,7 @@ def update_risk_limits(req: RiskLimitUpdate, db: Session = Depends(get_db)):
 
 @router.post("/kill-switch")
 def set_kill_switch(active: bool, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     if active:
         activate_kill_switch(db, portfolio)
     else:

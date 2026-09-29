@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models.trading import Portfolio, Position, RiskLimitConfig, Trade
+from app.models.trading import Portfolio, Position, RiskLimitConfig
 
 
 @dataclass
@@ -35,11 +35,17 @@ def get_or_create_risk_config(db: Session, portfolio: Portfolio) -> RiskLimitCon
     return config
 
 
+def open_positions(portfolio: Portfolio) -> list[Position]:
+    return [p for p in portfolio.positions if p.closed_at is None]
+
+
+def open_exposure(portfolio: Portfolio, price_lookup) -> float:
+    return sum(p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price) for p in open_positions(portfolio))
+
+
 def portfolio_equity(db: Session, portfolio: Portfolio, price_lookup) -> float:
     equity = portfolio.cash
-    for pos in portfolio.positions:
-        if pos.closed_at is not None:
-            continue
+    for pos in open_positions(portfolio):
         price = price_lookup(pos.asset.symbol) or pos.avg_entry_price
         sign = 1 if pos.side == "long" else -1
         equity += pos.qty * pos.avg_entry_price + pos.qty * (price - pos.avg_entry_price) * sign
@@ -74,10 +80,8 @@ def check_order(
     if notional > max_position_notional:
         notional = max_position_notional  # scale down rather than reject outright
 
-    open_exposure = sum(
-        p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price) for p in portfolio.positions if p.closed_at is None
-    )
-    if (open_exposure + notional) > equity * config.max_portfolio_exposure_pct:
+    exposure = open_exposure(portfolio, price_lookup)
+    if (exposure + notional) > equity * config.max_portfolio_exposure_pct:
         return RiskCheckResult(False, f"Order would breach max portfolio exposure ({config.max_portfolio_exposure_pct:.0%}).")
 
     pnl_today = daily_pnl(db, portfolio)

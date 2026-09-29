@@ -26,7 +26,7 @@ def run_and_store_backtest(db: Session, params: BacktestParams) -> Backtest:
 
     result = run_backtest(db, params)
 
-    row.status = "failed" if result.error and result.look_ahead_bias_detected else "completed"
+    row.status = "failed" if result.error else "completed"
     row.metrics = result.metrics
     row.equity_curve = [{"ts": ts, "equity": eq} for ts, eq in result.equity_curve]
     row.trades = [asdict(t) for t in result.trades]

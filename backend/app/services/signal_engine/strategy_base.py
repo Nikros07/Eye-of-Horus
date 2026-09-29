@@ -40,6 +40,15 @@ class StrategyContext:
     historical_analogue_count: int = 0
 
 
+def confidence_scaled_notional(confidence: float, equity: float, max_position_pct: float) -> float:
+    """Shared position-sizing formula: scale allocation proportionally with
+    confidence. Strategies already gate candidate generation on their own
+    minimum confidence, so sizing must not apply a second, differently
+    calibrated floor on top of that. Used by strategies, the backtester, and
+    the live trading service so sizing behaves identically everywhere."""
+    return equity * max_position_pct * max(confidence, 0.0)
+
+
 class StrategyBase(ABC):
     name: str = "unnamed"
     version: str = "1.0.0"
@@ -52,8 +61,4 @@ class StrategyBase(ABC):
         raise NotImplementedError
 
     def position_size(self, confidence: float, equity: float, max_position_pct: float) -> float:
-        """Default sizing: scale allocation proportionally with confidence.
-        Strategies already gate candidate generation on their own minimum
-        confidence, so sizing must not apply a second, differently
-        calibrated floor on top of that."""
-        return equity * max_position_pct * max(confidence, 0.0)
+        return confidence_scaled_notional(confidence, equity, max_position_pct)
