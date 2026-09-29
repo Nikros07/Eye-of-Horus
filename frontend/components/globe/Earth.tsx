@@ -20,16 +20,22 @@ import { withBasePath } from "@/lib/basePath";
  * than a decal.
  */
 
+// vNormal/vViewDir are computed in world space (not the camera-space
+// `normalMatrix`) so the terminator and specular sit at a fixed point on the
+// planet as the OrbitControls camera orbits around it — with a camera-space
+// normal, both would incorrectly track the camera's rotation instead of the
+// fixed `sunDirection` uniform, keeping a "lit" hemisphere facing the viewer
+// at every angle and making the night side unreachable.
 const vertexShader = `
 varying vec2 vUv;
 varying vec3 vNormal;
 varying vec3 vViewDir;
 void main() {
   vUv = uv;
-  vNormal = normalize(normalMatrix * normal);
-  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  vViewDir = normalize(-mvPosition.xyz);
-  gl_Position = projectionMatrix * mvPosition;
+  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  vViewDir = normalize(cameraPosition - worldPosition.xyz);
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }
 `;
 
