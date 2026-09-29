@@ -16,16 +16,16 @@ void main() {
 const fragmentShaderInner = `
 varying vec3 vNormal;
 void main() {
-  float intensity = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.2);
-  gl_FragColor = vec4(0.45, 0.65, 0.95, 1.0) * intensity;
+  float intensity = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+  gl_FragColor = vec4(0.5, 0.7, 1.0, 1.0) * intensity * 1.35;
 }
 `;
 
 const fragmentShaderOuter = `
 varying vec3 vNormal;
 void main() {
-  float intensity = pow(0.55 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.6);
-  gl_FragColor = vec4(0.35, 0.5, 0.85, 1.0) * intensity;
+  float intensity = pow(0.55 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.2);
+  gl_FragColor = vec4(0.4, 0.58, 0.95, 1.0) * intensity * 1.5;
 }
 `;
 
