@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models.trading import Portfolio, Position, RiskLimitConfig, Trade
+from app.models.trading import Portfolio, Position, RiskLimitConfig
 
 
 @dataclass
