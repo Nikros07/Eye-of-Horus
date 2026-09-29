@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_main_portfolio
@@ -21,12 +21,15 @@ router = APIRouter()
 
 
 class RiskLimitUpdate(BaseModel):
-    max_position_size_pct: float | None = None
-    max_daily_loss_pct: float | None = None
-    max_portfolio_exposure_pct: float | None = None
-    max_trades_per_day: int | None = None
-    max_drawdown_pct: float | None = None
-    cooldown_seconds: int | None = None
+    # Bounded so a limit can never be set to a value that silently defeats
+    # its own check (e.g. a negative max_daily_loss_pct makes the daily-loss
+    # guard in risk_engine.check_order unsatisfiable, disabling it outright).
+    max_position_size_pct: float | None = Field(default=None, gt=0, le=1)
+    max_daily_loss_pct: float | None = Field(default=None, gt=0, le=1)
+    max_portfolio_exposure_pct: float | None = Field(default=None, gt=0, le=1)
+    max_trades_per_day: int | None = Field(default=None, ge=1)
+    max_drawdown_pct: float | None = Field(default=None, gt=0, le=1)
+    cooldown_seconds: int | None = Field(default=None, ge=0)
 
 
 @router.get("")
