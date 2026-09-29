@@ -4,6 +4,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Trail } from "@react-three/drei";
 import * as THREE from "three";
+import { latLonToVec3 } from "@/lib/geo";
 
 /**
  * Decorative live-traffic layer. Routes are real major city pairs; motion is
@@ -25,16 +26,6 @@ const ROUTES: [string, [number, number], string, [number, number]][] = [
   ["CDG", [49.01, 2.55], "JNB", [-26.13, 28.24]],
 ];
 
-function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
-  const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lon + 180) * (Math.PI / 180);
-  return new THREE.Vector3(
-    -radius * Math.sin(phi) * Math.cos(theta),
-    radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.sin(theta)
-  );
-}
-
 function Flight({
   from,
   to,
@@ -53,13 +44,16 @@ function Flight({
 
   const a = useMemo(() => latLonToVec3(from[0], from[1], altitude), [from, altitude]);
   const b = useMemo(() => latLonToVec3(to[0], to[1], altitude), [to, altitude]);
+  // Reused across frames instead of allocating a new Vector3 every tick —
+  // there are 8 of these animating in lockstep, every frame.
+  const pos = useRef(new THREE.Vector3());
 
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const raw = (clock.getElapsedTime() * speed + phase) % 2;
     const t = 1 - Math.abs(raw - 1); // ping-pong 0 -> 1 -> 0, no jump
-    const pos = new THREE.Vector3().lerpVectors(a, b, t).normalize().multiplyScalar(altitude);
-    meshRef.current.position.copy(pos);
+    pos.current.lerpVectors(a, b, t).normalize().multiplyScalar(altitude);
+    meshRef.current.position.copy(pos.current);
   });
 
   return (

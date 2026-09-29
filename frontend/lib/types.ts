@@ -221,6 +221,43 @@ export interface ResearchOutput {
   source: string;
 }
 
+export interface PortfolioPerformance {
+  equity_curve: { ts: string; equity: number }[];
+  closed_trade_count: number;
+  win_rate: number | null;
+  avg_win: number | null;
+  avg_loss: number | null;
+  max_drawdown_pct: number;
+  total_fees: number;
+}
+
+export interface OrderInfo {
+  order_id: string;
+  asset_symbol: string;
+  side: string;
+  qty: number;
+  order_type: string;
+  status: string;
+  filled_price: number | null;
+  submitted_at: string;
+}
+
+export interface ReplaySignal {
+  event_id: string;
+  asset_symbol: string;
+  direction: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  strategy: string;
+  reasoning: string;
+}
+
+export interface ReplayResult {
+  as_of: string;
+  known_events: EventDetail[];
+  would_have_generated_signals: ReplaySignal[];
+  note: string;
+}
+
 export interface TradeAnalysis {
   signal_id: string;
   asset_symbol: string;

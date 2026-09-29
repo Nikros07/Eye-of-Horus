@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { useRouter } from "next/navigation";
 import type { EventSummary } from "@/lib/types";
 import { titleCase } from "@/lib/format";
+import { latLonToVec3 } from "@/lib/geo";
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: "#F17178",
@@ -14,16 +15,6 @@ const SEVERITY_COLOR: Record<string, string> = {
   medium: "#82AAF5",
   low: "#8B94A3",
 };
-
-function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
-  const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lon + 180) * (Math.PI / 180);
-  return new THREE.Vector3(
-    -radius * Math.sin(phi) * Math.cos(theta),
-    radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.sin(theta)
-  );
-}
 
 // A soft radial-gradient sprite used as an additive glow behind each marker
 // — cheap (one shared texture for every marker) and reads as a real point

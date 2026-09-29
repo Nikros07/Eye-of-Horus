@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { latLonToVec3 } from "@/lib/geo";
 
 /**
  * Decorative shipping-lane layer, same demo/live split as FlightMarkers —
@@ -17,16 +18,6 @@ const ROUTES: [string, [number, number], string, [number, number]][] = [
   ["Los Angeles", [33.7, -118.2], "Shanghai", [31.23, 121.47]],
   ["Santos", [-23.96, -46.33], "Rotterdam", [51.9, 4.48]],
 ];
-
-function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
-  const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lon + 180) * (Math.PI / 180);
-  return new THREE.Vector3(
-    -radius * Math.sin(phi) * Math.cos(theta),
-    radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.sin(theta)
-  );
-}
 
 function Vessel({
   from,
@@ -46,13 +37,14 @@ function Vessel({
 
   const a = useMemo(() => latLonToVec3(from[0], from[1], surface), [from, surface]);
   const b = useMemo(() => latLonToVec3(to[0], to[1], surface), [to, surface]);
+  const pos = useRef(new THREE.Vector3());
 
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const raw = (clock.getElapsedTime() * speed + phase) % 2;
     const t = 1 - Math.abs(raw - 1);
-    const pos = new THREE.Vector3().lerpVectors(a, b, t).normalize().multiplyScalar(surface);
-    meshRef.current.position.copy(pos);
+    pos.current.lerpVectors(a, b, t).normalize().multiplyScalar(surface);
+    meshRef.current.position.copy(pos.current);
   });
 
   return (

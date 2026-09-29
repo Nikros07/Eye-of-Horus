@@ -9,15 +9,8 @@ import ImpactChain from "@/components/impact/ImpactChain";
 import SignalBadge from "@/components/cards/SignalBadge";
 import DemoDataBadge from "@/components/common/DemoDataBadge";
 import EquityCurveChart from "@/components/charts/EquityCurveChart";
-import { formatConfidence, relativeTime, severityColor, titleCase } from "@/lib/format";
+import { formatConfidence, relativeTime, severityColor, titleCase, verificationStyle } from "@/lib/format";
 import clsx from "clsx";
-
-const verificationStyle: Record<string, string> = {
-  verified: "border-gold/30 bg-gold/10 text-gold-bright",
-  pending: "border-info/30 bg-info/10 text-info-bright",
-  unverified: "border-white/10 bg-white/5 text-text-secondary",
-  disputed: "border-danger/30 bg-danger/10 text-danger-bright",
-};
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
