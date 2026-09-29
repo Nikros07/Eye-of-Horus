@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Trail } from "@react-three/drei";
 import * as THREE from "three";
@@ -47,17 +47,30 @@ function Flight({
   // Reused across frames instead of allocating a new Vector3 every tick —
   // there are 8 of these animating in lockstep, every frame.
   const pos = useRef(new THREE.Vector3());
+  // The trail's ribbon geometry degenerates into a dark folded artifact at
+  // the exact vertex where travel direction reverses 180° (its miter/width
+  // calculation divides by ~zero when incoming and outgoing directions are
+  // opposite) — remounting <Trail> at each leg boundary via `key` clears its
+  // point history before that vertex is ever recorded, instead of trying to
+  // recover from a reversal already baked into the buffer.
+  const legRef = useRef(0);
+  const [leg, setLeg] = useState(0);
 
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const raw = (clock.getElapsedTime() * speed + phase) % 2;
+    const currentLeg = raw < 1 ? 0 : 1;
+    if (currentLeg !== legRef.current) {
+      legRef.current = currentLeg;
+      setLeg(currentLeg);
+    }
     const t = 1 - Math.abs(raw - 1); // ping-pong 0 -> 1 -> 0, no jump
     pos.current.lerpVectors(a, b, t).normalize().multiplyScalar(altitude);
     meshRef.current.position.copy(pos.current);
   });
 
   return (
-    <Trail width={1.1} length={4.5} color="#82AAF5" attenuation={(w) => w} decay={1}>
+    <Trail key={leg} width={1.1} length={4.5} color="#82AAF5" attenuation={(w) => w} decay={1}>
       <mesh ref={meshRef}>
         <sphereGeometry args={[0.014, 6, 6]} />
         <meshBasicMaterial color="#CFE0FF" toneMapped={false} />
