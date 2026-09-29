@@ -15,6 +15,7 @@ frontend/.next/
 frontend/out/
 frontend/.env.local
 frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
 AGENTS.md
 CLAUDE.md
 
