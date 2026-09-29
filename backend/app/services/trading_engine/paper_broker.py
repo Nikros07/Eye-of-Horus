@@ -90,6 +90,14 @@ class PaperBroker(BrokerAdapter):
         ]
 
     def place_order(self, request: OrderRequest) -> OrderInfo:
+        if request.qty <= 0:
+            # A non-positive qty must never reach the cash/position math
+            # below: for a "buy" it makes `cost` negative, which passes the
+            # `cost > cash` check and then *credits* cash on self.portfolio.cash
+            # -= cost — free money out of a quantity that should have been
+            # rejected outright.
+            return self._rejected(request, "Order quantity must be positive.")
+
         asset = self.db.query(Asset).filter(Asset.symbol == request.asset_symbol).one_or_none()
         if asset is None:
             return self._rejected(request, "Unknown asset symbol.")

@@ -58,6 +58,27 @@ def test_close_position_realizes_pnl(db_session):
     assert broker.get_positions() == []
 
 
+def test_negative_qty_buy_is_rejected_not_credited_as_free_cash(db_session):
+    """Regression test: place_order used to have no qty > 0 guard. A "buy"
+    with a negative qty made `cost = qty * fill_price + fees` negative,
+    which passed the `cost > cash` check and then *increased* cash via
+    `cash -= cost` — a negative-qty order minted free paper cash."""
+    portfolio, broker = _setup(db_session)
+    starting_cash = portfolio.cash
+
+    order = broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=-1000))
+
+    assert order.status.startswith("rejected")
+    assert portfolio.cash == starting_cash
+    assert broker.get_positions() == []
+
+
+def test_zero_qty_order_is_rejected(db_session):
+    _, broker = _setup(db_session)
+    order = broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=0))
+    assert order.status.startswith("rejected")
+
+
 def test_two_buys_in_the_same_uncommitted_session_accumulate_into_one_position(db_session):
     """Regression test: PaperBroker used to attach new Position/Trade rows to
     the portfolio via `portfolio_id=` alone, which never updates the

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_main_portfolio
@@ -29,7 +29,7 @@ class ModeChangeRequest(BaseModel):
 class ManualOrderRequest(BaseModel):
     asset_symbol: str
     side: str  # buy / sell
-    qty: float
+    qty: float = Field(gt=0)
 
 
 class AutoTradeRequest(BaseModel):
