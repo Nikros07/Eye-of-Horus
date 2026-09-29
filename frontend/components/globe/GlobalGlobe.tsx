@@ -3,10 +3,12 @@
 import { Suspense, useCallback, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import clsx from "clsx";
 import Earth from "./Earth";
+import Clouds from "./Clouds";
 import Atmosphere from "./Atmosphere";
 import EventMarkers from "./EventMarkers";
 import FlightMarkers from "./FlightMarkers";
@@ -75,7 +77,7 @@ export default function GlobalGlobe({
     >
       {expanded && <div className="absolute inset-0 -z-10 rounded-3xl bg-ink-950/95 backdrop-blur-xl" />}
 
-      <Canvas camera={{ position: [0, 0, 6.2], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
+      <Canvas camera={{ position: [0, 0, 5.2], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
         <ambientLight intensity={0.4} />
         <directionalLight position={[4, 2.2, 4.5]} intensity={1.2} color="#F4E4C1" />
         <directionalLight position={[-5, -2, -5]} intensity={0.2} color="#5B8DEF" />
@@ -84,6 +86,7 @@ export default function GlobalGlobe({
 
         <Suspense fallback={<EarthFallback radius={2.2} />}>
           <Earth radius={2.2} />
+          <Clouds radius={2.2} />
         </Suspense>
         <Atmosphere radius={2.2} />
         <EventMarkers events={events} radius={2.2} />
@@ -98,7 +101,7 @@ export default function GlobalGlobe({
           ref={controlsRef}
           enablePan={false}
           enableZoom
-          minDistance={3.2}
+          minDistance={2.6}
           maxDistance={10}
           minPolarAngle={0}
           maxPolarAngle={Math.PI}
@@ -111,6 +114,11 @@ export default function GlobalGlobe({
           onStart={handleStart}
           onEnd={handleEnd}
         />
+
+        <EffectComposer multisampling={0}>
+          <Bloom mipmapBlur luminanceThreshold={0.92} luminanceSmoothing={0.15} intensity={0.35} radius={0.4} />
+          <Vignette eskil={false} offset={0.15} darkness={0.55} />
+        </EffectComposer>
       </Canvas>
 
       {/* Controls overlay */}
