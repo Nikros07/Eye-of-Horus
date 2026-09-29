@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import { AreaChart, Area } from "recharts";
 import { api } from "@/lib/api";
 import { relativeTime, titleCase } from "@/lib/format";
 
@@ -12,6 +13,34 @@ const severityDot: Record<string, string> = {
   medium: "bg-info-bright shadow-[0_0_8px_1px_rgba(130,170,245,0.4)]",
   low: "bg-text-tertiary",
 };
+
+// Keyed exactly like MarketCard's own history fetch so the two share one
+// SWR cache entry per symbol instead of double-fetching the same bars.
+function AlertSparkline({ symbol, positive }: { symbol: string; positive: boolean }) {
+  const { data } = useSWR(["market-card-history", symbol], () => api.assetHistory(symbol, 48));
+  const bars = data?.bars || [];
+  if (bars.length < 2) return <div className="h-[18px] w-11 shrink-0" />;
+
+  const color = positive ? "#EACB8C" : "#F17178";
+  return (
+    <AreaChart width={44} height={18} data={bars.map((b, i) => ({ i, v: b.close }))} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+      <defs>
+        <linearGradient id={`alert-spark-${symbol}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.45} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <Area
+        type="monotone"
+        dataKey="v"
+        stroke={color}
+        strokeWidth={1}
+        fill={`url(#alert-spark-${symbol})`}
+        isAnimationActive={false}
+      />
+    </AreaChart>
+  );
+}
 
 export default function AlertTicker() {
   const { data: alerts } = useSWR("hero-alerts", () => api.alerts({ limit: 14, hours: 168 }), {
@@ -47,6 +76,7 @@ export default function AlertTicker() {
                 <div className="flex items-center gap-2">
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${severityDot[a.severity]}`} />
                   <span className="truncate text-[12.5px] font-semibold text-text-primary">{a.asset_symbol}</span>
+                  <AlertSparkline symbol={a.asset_symbol} positive={a.direction === "bullish"} />
                   <span
                     className={`ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wide ${
                       a.direction === "bullish" ? "text-gold-bright" : "text-danger-bright"

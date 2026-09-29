@@ -14,6 +14,14 @@ export function formatConfidence(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+// A plain ratio-as-percentage, unlike formatPercent's "+2.50%" — for values
+// that are a share or a ceiling (exposure, position concentration, a
+// configured risk limit) rather than a gain/loss where the sign is itself
+// the point.
+export function formatRatio(value: number, digits = 1): string {
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
 export function titleCase(input: string): string {
   return input
     .replace(/_/g, " ")
