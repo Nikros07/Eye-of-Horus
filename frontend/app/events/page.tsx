@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
@@ -48,12 +49,11 @@ function ResearchList({ label, items, tone }: { label: string; items: string[]; 
   );
 }
 
-export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const { data: event } = useSWR(["event", id], () => api.event(id));
-  const { data: analogues } = useSWR(["analogues", id], () => api.historicalAnalogues(id));
-  const { data: signals } = useSWR(["event-signals", id], () => api.signals({ limit: 100 }));
-  const { data: research } = useSWR(["research", id], () => api.eventResearch(id));
+function EventDetailContent({ id }: { id: string }) {
+  const { data: event } = useSWR(id ? ["event", id] : null, () => api.event(id));
+  const { data: analogues } = useSWR(id ? ["analogues", id] : null, () => api.historicalAnalogues(id));
+  const { data: signals } = useSWR(id ? ["event-signals", id] : null, () => api.signals({ limit: 100 }));
+  const { data: research } = useSWR(id ? ["research", id] : null, () => api.eventResearch(id));
   const [priceSymbol, setPriceSymbol] = useState<string | null>(null);
 
   const eventSignals = (signals || []).filter((s) => s.event_id === id);
@@ -65,10 +65,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     () => api.assetHistory(activeSymbol as string, 168)
   );
 
+  if (!id) {
+    return <div className="mx-auto max-w-4xl px-6 py-24 text-center text-text-tertiary">No event selected.</div>;
+  }
+
   if (!event) {
-    return (
-      <div className="mx-auto max-w-4xl px-6 py-24 text-center text-text-tertiary">Loading event…</div>
-    );
+    return <div className="mx-auto max-w-4xl px-6 py-24 text-center text-text-tertiary">Loading event…</div>;
   }
 
   return (
@@ -169,7 +171,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {(analogues || []).map((a) => (
                 <a
                   key={a.event_id}
-                  href={`/events/${a.event_id}`}
+                  href={`/events?id=${a.event_id}`}
                   className="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5 text-[13px] transition-colors hover:border-gold/30"
                 >
                   <span className="text-text-secondary">{a.title}</span>
@@ -233,5 +235,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
     </div>
+  );
+}
+
+function EventDetailInner() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") || "";
+  return <EventDetailContent id={id} />;
+}
+
+// useSearchParams() requires a Suspense boundary even in client components —
+// this is also what makes the route compatible with `output: "export"" (the
+// GitHub Pages build): a query-param page needs no generateStaticParams,
+// unlike a [id] dynamic segment would.
+export default function EventDetailPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-4xl px-6 py-24 text-center text-text-tertiary">Loading…</div>}>
+      <EventDetailInner />
+    </Suspense>
   );
 }

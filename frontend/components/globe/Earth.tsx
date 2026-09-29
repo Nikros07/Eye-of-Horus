@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { withBasePath } from "@/lib/basePath";
 
 /**
  * Real photographic Earth textures (day / night city-lights / topology),
@@ -57,9 +58,9 @@ void main() {
 
 export default function Earth({ radius = 2.2 }: { radius?: number }) {
   const [dayMap, nightMap, reliefMap] = useLoader(THREE.TextureLoader, [
-    "/textures/earth-day.jpg",
-    "/textures/earth-night.jpg",
-    "/textures/earth-topology.png",
+    withBasePath("/textures/earth-day.jpg"),
+    withBasePath("/textures/earth-night.jpg"),
+    withBasePath("/textures/earth-topology.png"),
   ]);
 
   const uniforms = useMemo(

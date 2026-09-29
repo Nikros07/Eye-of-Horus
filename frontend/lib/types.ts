@@ -152,6 +152,7 @@ export interface Alert {
   signal_id: string;
   severity: "critical" | "high" | "medium" | "low";
   asset_symbol: string;
+  event_id: string | null;
   event_type: string | null;
   event_title: string | null;
   direction: string;

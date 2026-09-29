@@ -16,9 +16,12 @@ from app.core.db import SessionLocal
 from app.services.event_engine.ingest import run_event_ingestion
 from app.services.impact_engine.graph import build_impact_links
 from app.services.signal_engine.generator import generate_signals_for_event
+from app.services.trading_engine.auto_trade import run_auto_trade_cycle
 
 logger = logging.getLogger("eye_of_horus")
 _scheduler: BackgroundScheduler | None = None
+
+AUTO_TRADE_INTERVAL_SECONDS = 90
 
 
 def _run_ingestion_cycle() -> None:
@@ -41,6 +44,21 @@ def _run_ingestion_cycle() -> None:
         db.close()
 
 
+def _run_auto_trade_cycle() -> None:
+    db = SessionLocal()
+    try:
+        outcomes = run_auto_trade_cycle(db)
+        db.commit()
+        if outcomes:
+            approved = sum(1 for o in outcomes if o.approved)
+            logger.info("Auto-trade cycle: %d/%d signals filled", approved, len(outcomes))
+    except Exception:  # noqa: BLE001
+        logger.exception("Auto-trade cycle failed")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
@@ -54,6 +72,12 @@ def start_scheduler() -> BackgroundScheduler:
         seconds=settings.ingestion_interval_seconds,
         id="event_ingestion_cycle",
         next_run_time=None,  # first run already happened via bootstrap seeding
+    )
+    scheduler.add_job(
+        _run_auto_trade_cycle,
+        "interval",
+        seconds=AUTO_TRADE_INTERVAL_SECONDS,
+        id="auto_trade_cycle",
     )
     scheduler.start()
     _scheduler = scheduler

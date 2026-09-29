@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import EquityCurveChart from "@/components/charts/EquityCurveChart";
 import PositionCard from "@/components/cards/PositionCard";
 import SignalBadge from "@/components/cards/SignalBadge";
+import Toggle from "@/components/common/Toggle";
 import { formatCompactCurrency, formatConfidence, titleCase } from "@/lib/format";
 
 export default function TradingPage() {
@@ -21,6 +22,7 @@ export default function TradingPage() {
     refreshInterval: 8000,
   });
   const { data: mode } = useSWR("mode-trading", () => api.tradingMode());
+  const { data: autoTrade } = useSWR("auto-trade", () => api.autoTrade(), { refreshInterval: 15000 });
   const { data: account } = useSWR("account-trading", () => api.account(), { refreshInterval: 8000 });
   const { data: positions } = useSWR("positions-trading", () => api.positions(), { refreshInterval: 8000 });
   const { data: signals } = useSWR("signals-trading", () => api.signals({ limit: 30 }), { refreshInterval: 15000 });
@@ -190,6 +192,60 @@ export default function TradingPage() {
               <p className="mt-2 text-[11px] text-text-tertiary">Research mode: analysis only, no orders placed.</p>
             )}
             {feedback && <p className="mt-3 text-[12px] text-text-secondary">{feedback}</p>}
+          </div>
+
+          <div className="rounded-2xl border border-border glass p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-[12px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+                  Automatic Trading
+                </h2>
+                <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
+                  Executes fresh signals above the confidence floor on its own, every 90s — through the same risk
+                  checks as a manual order. Always paper unless the portfolio mode is switched to live.
+                </p>
+              </div>
+              <Toggle
+                checked={autoTrade?.enabled ?? false}
+                disabled={mode?.mode === "research"}
+                onChange={async (v) => {
+                  await api.setAutoTrade(v);
+                  mutate("auto-trade");
+                }}
+                label="Automatic trading"
+              />
+            </div>
+
+            {autoTrade && (
+              <div className="mt-4 border-t border-border pt-4">
+                <div className="flex items-center justify-between text-[11px] text-text-tertiary">
+                  <span>Min. confidence</span>
+                  <span className="mono-num text-text-primary">{formatConfidence(autoTrade.min_confidence)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.4}
+                  max={0.9}
+                  step={0.05}
+                  value={autoTrade.min_confidence}
+                  onChange={async (e) => {
+                    await api.setAutoTrade(autoTrade.enabled, parseFloat(e.target.value));
+                    mutate("auto-trade");
+                  }}
+                  className="mt-2 w-full accent-gold"
+                />
+              </div>
+            )}
+
+            {autoTrade?.enabled && (
+              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gold-bright">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold-bright opacity-60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gold-bright" />
+                </span>
+                Watching for signals
+              </div>
+            )}
           </div>
         </aside>
       </div>

@@ -38,6 +38,11 @@ class ManualOrderRequest(BaseModel):
     qty: float
 
 
+class AutoTradeRequest(BaseModel):
+    enabled: bool
+    min_confidence: float | None = None
+
+
 @router.get("/mode")
 def get_mode(db: Session = Depends(get_db)):
     portfolio = _get_portfolio(db)
@@ -58,6 +63,26 @@ def set_mode(req: ModeChangeRequest, db: Session = Depends(get_db)):
     portfolio.mode = req.mode
     db.commit()
     return {"mode": portfolio.mode}
+
+
+@router.get("/auto-trade")
+def get_auto_trade(db: Session = Depends(get_db)):
+    portfolio = _get_portfolio(db)
+    return {"enabled": portfolio.auto_trade_enabled, "min_confidence": portfolio.auto_trade_min_confidence}
+
+
+@router.post("/auto-trade")
+def set_auto_trade(req: AutoTradeRequest, db: Session = Depends(get_db)):
+    portfolio = _get_portfolio(db)
+    if portfolio.mode == "research" and req.enabled:
+        raise HTTPException(403, "Portfolio is in RESEARCH mode — switch to paper (or live) before enabling auto-trade.")
+    portfolio.auto_trade_enabled = req.enabled
+    if req.min_confidence is not None:
+        if not 0 <= req.min_confidence <= 1:
+            raise HTTPException(400, "min_confidence must be between 0 and 1")
+        portfolio.auto_trade_min_confidence = req.min_confidence
+    db.commit()
+    return {"enabled": portfolio.auto_trade_enabled, "min_confidence": portfolio.auto_trade_min_confidence}
 
 
 @router.get("/account")

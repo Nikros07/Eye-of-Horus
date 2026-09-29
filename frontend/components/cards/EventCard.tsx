@@ -18,7 +18,7 @@ export default function EventCard({ event }: { event: EventSummary }) {
   const topAsset = Object.entries(event.market_exposure || {}).sort((a, b) => b[1] - a[1])[0];
 
   return (
-    <Link href={`/events/${event.event_id}`}>
+    <Link href={`/events?id=${event.event_id}`}>
       <Card3D glow={severityGlow(event.severity)} className="p-5 h-full" intensity={5}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

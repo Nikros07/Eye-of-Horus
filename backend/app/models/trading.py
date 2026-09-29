@@ -23,6 +23,15 @@ class Portfolio(Base):
     cash: Mapped[float] = mapped_column(Float, default=10_000.0)
     initial_capital: Mapped[float] = mapped_column(Float, default=10_000.0)
 
+    # When true, the scheduler (see app/workers/scheduler.py) executes fresh
+    # signals above auto_trade_min_confidence on its own, through the exact
+    # same RiskEngine -> BrokerAdapter path a manual click would use. Off by
+    # default — this is opt-in automation, always paper unless the portfolio
+    # mode is separately switched to live (which itself requires
+    # LIVE_TRADING_ENABLED=true).
+    auto_trade_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    auto_trade_min_confidence: Mapped[float] = mapped_column(Float, default=0.6)
+
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
 
     positions: Mapped[list["Position"]] = relationship(back_populates="portfolio", cascade="all, delete-orphan")
@@ -78,6 +87,30 @@ class Trade(Base):
 
     portfolio: Mapped[Portfolio] = relationship(back_populates="trades")
     asset = relationship("Asset")
+
+
+class AutoTradeAttempt(Base):
+    """One row per (portfolio, signal) the auto-trade scheduler has ever
+    considered — approved or rejected. This is the idempotency ledger: unlike
+    `Trade`, which only gets a row on a successful fill, this table records
+    every decision so a rejected signal (e.g. a bearish signal with no
+    existing long position — no short-selling in this MVP) is never retried
+    on the next scheduler cycle. It also doubles as an audit trail for "why
+    didn't this signal get auto-traded".
+    """
+
+    __tablename__ = "auto_trade_attempts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    signal_id: Mapped[int] = mapped_column(ForeignKey("signals.id"), index=True)
+
+    approved: Mapped[bool] = mapped_column(Boolean)
+    reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, index=True)
+
+    portfolio: Mapped[Portfolio] = relationship()
 
 
 class RiskLimitConfig(Base):
