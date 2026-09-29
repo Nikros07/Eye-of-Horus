@@ -7,7 +7,7 @@ from app.api.deps import get_main_portfolio
 from app.api.serializers import serialize_position, serialize_trade
 from app.core.db import get_db
 from app.services.market_engine.factory import get_market_source
-from app.services.trading_engine.risk_engine import daily_pnl, portfolio_equity
+from app.services.trading_engine.risk_engine import daily_pnl, open_exposure, open_positions, portfolio_equity
 
 router = APIRouter()
 
@@ -19,8 +19,8 @@ def get_portfolio_summary(db: Session = Depends(get_db)):
     price_lookup = market_source.get_price
 
     equity = portfolio_equity(db, portfolio, price_lookup)
-    open_positions = [p for p in portfolio.positions if p.closed_at is None]
-    exposure = sum(p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price) for p in open_positions)
+    positions = open_positions(portfolio)
+    exposure = open_exposure(portfolio, price_lookup)
 
     return {
         "name": portfolio.name,
@@ -32,8 +32,8 @@ def get_portfolio_summary(db: Session = Depends(get_db)):
         "daily_pnl": round(daily_pnl(db, portfolio), 2),
         "open_exposure": round(exposure, 2),
         "exposure_pct": round(exposure / equity, 4) if equity else 0.0,
-        "open_position_count": len(open_positions),
-        "positions": [serialize_position(p, price_lookup(p.asset.symbol)) for p in open_positions],
+        "open_position_count": len(positions),
+        "positions": [serialize_position(p, price_lookup(p.asset.symbol)) for p in positions],
     }
 
 

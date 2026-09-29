@@ -12,6 +12,8 @@ from app.services.trading_engine.risk_engine import (
     daily_pnl,
     deactivate_kill_switch,
     get_or_create_risk_config,
+    open_exposure,
+    open_positions,
     portfolio_equity,
 )
 
@@ -35,8 +37,8 @@ def get_risk_snapshot(db: Session = Depends(get_db)):
     price_lookup = market_source.get_price
 
     equity = portfolio_equity(db, portfolio, price_lookup)
-    open_positions = [p for p in portfolio.positions if p.closed_at is None]
-    exposure = sum(p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price) for p in open_positions)
+    positions = open_positions(portfolio)
+    exposure = open_exposure(portfolio, price_lookup)
     drawdown = (portfolio.initial_capital - equity) / portfolio.initial_capital if portfolio.initial_capital else 0.0
 
     return {
@@ -57,7 +59,7 @@ def get_risk_snapshot(db: Session = Depends(get_db)):
             "daily_pnl": round(daily_pnl(db, portfolio), 2),
             "position_concentration": {
                 p.asset.symbol: round((p.qty * (price_lookup(p.asset.symbol) or p.avg_entry_price)) / exposure, 4)
-                for p in open_positions
+                for p in positions
             }
             if exposure
             else {},
