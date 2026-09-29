@@ -21,7 +21,7 @@ export default function ReplayPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 pb-24 pt-8">
-      <h1 className="text-[24px] font-semibold text-text-primary">Research Replay</h1>
+      <h1 className="text-gradient-gold text-[24px] font-semibold">Research Replay</h1>
       <p className="mt-1 max-w-2xl text-[13px] text-text-secondary">
         Pick a historical instant. The system reconstructs exactly what it knew then — no data with a later
         availability_time is ever shown here.

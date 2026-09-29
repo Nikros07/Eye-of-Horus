@@ -17,7 +17,7 @@ export default function SystemPage() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 pb-24 pt-8">
-      <h1 className="text-[24px] font-semibold text-text-primary">System Status</h1>
+      <h1 className="text-gradient-gold text-[24px] font-semibold">System Status</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         {status?.app} · {status?.environment} · data mode:{" "}
         <span className="font-semibold text-text-primary">{status?.data_mode}</span> · live trading:{" "}

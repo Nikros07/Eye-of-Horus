@@ -52,7 +52,7 @@ export default function TradingPage() {
     <div className="mx-auto max-w-[1600px] px-6 pb-24 pt-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-[24px] font-semibold text-text-primary">Trading Terminal</h1>
+          <h1 className="text-gradient-gold text-[24px] font-semibold">Trading Terminal</h1>
           <p className="mt-1 text-[13px] text-text-secondary">
             {mode?.mode === "paper" ? "Paper mode — simulated fills, real ledger." : titleCase(mode?.mode || "")}
           </p>

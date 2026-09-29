@@ -84,7 +84,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             {event.verification_status}
           </span>
         </div>
-        <h1 className="mt-2 text-[30px] font-semibold leading-tight text-text-primary">{event.title}</h1>
+        <h1 className="text-gradient-gold mt-2 text-[30px] font-semibold leading-tight">{event.title}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-4 text-[13px] text-text-secondary">
           <span>{event.location_name || "Location unknown"}</span>
           <span className={clsx("font-bold uppercase", severityColor[event.severity])}>{event.severity} impact</span>

@@ -55,7 +55,7 @@ export default function BacktestLabPage() {
 
   return (
     <div className="mx-auto max-w-[1500px] px-6 pb-24 pt-8">
-      <h1 className="text-[24px] font-semibold text-text-primary">Backtest Lab</h1>
+      <h1 className="text-gradient-gold text-[24px] font-semibold">Backtest Lab</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         Event-driven backtests with enforced temporal integrity — no strategy ever sees data before its
         availability_time.

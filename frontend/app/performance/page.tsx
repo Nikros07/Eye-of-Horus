@@ -24,7 +24,7 @@ export default function PerformancePage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 pb-24 pt-8">
-      <h1 className="text-[24px] font-semibold text-text-primary">Performance</h1>
+      <h1 className="text-gradient-gold text-[24px] font-semibold">Performance</h1>
       <p className="mt-1 text-[13px] text-text-secondary">Paper trading track record for the active portfolio.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">

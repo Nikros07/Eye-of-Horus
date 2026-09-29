@@ -45,7 +45,7 @@ export default function DashboardPage() {
         className="mb-8"
       >
         <div className="flex items-center gap-3">
-          <h1 className="text-[26px] font-semibold tracking-tight text-text-primary">Global Market Status</h1>
+          <h1 className="text-gradient-gold text-[26px] font-semibold tracking-tight">Global Market Status</h1>
           {status?.data_mode === "demo" && <DemoDataBadge />}
         </div>
         <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-text-secondary">
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-5 pt-5">
             <SectionLabel>Global Event Map</SectionLabel>
           </div>
-          <GlobalGlobe events={events || []} className="h-[380px] w-full cursor-grab active:cursor-grabbing" />
+          <GlobalGlobe events={events || []} className="h-[560px] w-full cursor-grab active:cursor-grabbing" />
         </div>
       </div>
 

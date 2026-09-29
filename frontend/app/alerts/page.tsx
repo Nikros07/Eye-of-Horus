@@ -30,7 +30,7 @@ export default function AlertsPage() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 pb-24 pt-8">
-      <h1 className="text-[24px] font-semibold text-text-primary">Alert Center</h1>
+      <h1 className="text-gradient-gold text-[24px] font-semibold">Alert Center</h1>
       <p className="mt-1 text-[13px] text-text-secondary">Derived directly from the signal engine — never stored separately.</p>
 
       <div className="mt-6 flex gap-2">
