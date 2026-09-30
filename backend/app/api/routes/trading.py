@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -30,7 +32,11 @@ class ModeChangeRequest(BaseModel):
 
 class ManualOrderRequest(BaseModel):
     asset_symbol: str
-    side: str  # buy / sell
+    side: Literal["buy", "sell"]
+    # A negative or zero qty reached the broker unchecked: for a "buy" it
+    # made cost negative, so `cost > portfolio.cash` never rejected it and
+    # `cash -= cost` *added* cash while opening a negative position — a free
+    # money and free short-position exploit. gt=0 closes it at the boundary.
     qty: float = Field(gt=0)
 
 

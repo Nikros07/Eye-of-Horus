@@ -130,6 +130,52 @@ def test_replay_context_excludes_future_historical_analogues(db_session):
     assert ctx_after_both.historical_analogue_count == 1
 
 
+def test_build_context_for_event_analogue_count_excludes_future_analogues(db_session):
+    """generator.build_context_for_event feeds the /api/replay endpoint,
+    which promises no data whose availability_time is after `as_of` is ever
+    used. historical_analogue_count must therefore respect `as_of` exactly
+    like the backtester's own analogue-count query does (see
+    backtester.run_backtest) — this is the same look-ahead-bias class
+    already fixed there, caught here in the live/replay code path instead."""
+    from app.models.event import Event
+    from app.services.signal_engine.generator import build_context_for_event
+
+    base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    subject = Event(
+        event_type="wildfire",
+        title="Subject event",
+        timestamp=base_time,
+        lat=0.0,
+        lon=0.0,
+        availability_time=base_time,
+        is_demo=True,
+    )
+    future_analogue = Event(
+        event_type="wildfire",
+        title="Future analogue — must NOT be counted at as_of=base_time",
+        timestamp=base_time + timedelta(days=10),
+        lat=0.0,
+        lon=0.0,
+        availability_time=base_time + timedelta(days=10),
+        is_demo=True,
+    )
+    past_analogue = Event(
+        event_type="wildfire",
+        title="Past analogue — must be counted",
+        timestamp=base_time - timedelta(days=5),
+        lat=0.0,
+        lon=0.0,
+        availability_time=base_time - timedelta(days=5),
+        is_demo=True,
+    )
+    db_session.add_all([subject, future_analogue, past_analogue])
+    db_session.commit()
+
+    ctx = build_context_for_event(db_session, subject, as_of=base_time)
+
+    assert ctx.historical_analogue_count == 1
+
+
 def test_demo_price_generation_is_deterministic():
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
     end = start + timedelta(hours=48)

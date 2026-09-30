@@ -82,11 +82,6 @@ def test_system_status_reports_demo_sources(api_client):
     assert all(s["is_demo"] for s in body["data_sources"])
 
 
-def test_manual_order_rejects_non_positive_qty(api_client):
-    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": -10})
-    assert resp.status_code == 422
-
-
 def test_kill_switch_blocks_manual_order(api_client):
     """The kill switch must block every order path, not just signal-driven
     execution — a manual click bypassing it entirely (as the /api/trading/orders
@@ -118,6 +113,28 @@ def test_kill_switch_blocks_position_close(api_client):
     resp = api_client.post("/api/trading/positions/CL=F/close")
     assert resp.status_code == 403
     assert "Kill switch" in resp.json()["detail"]
+
+
+def test_manual_order_rejects_non_positive_qty(api_client):
+    """A negative qty used to reach the broker unchecked: for a buy it made
+    `cost` negative, so `cost > portfolio.cash` never rejected it and
+    `cash -= cost` added cash for free while opening a negative position.
+    qty must be validated at the request boundary (gt=0)."""
+    cash_before = api_client.get("/api/trading/account").json()["cash"]
+
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": -5})
+    assert resp.status_code == 422
+
+    resp_zero = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 0})
+    assert resp_zero.status_code == 422
+
+    cash_after = api_client.get("/api/trading/account").json()["cash"]
+    assert cash_after == cash_before
+
+
+def test_manual_order_rejects_invalid_side(api_client):
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "hodl", "qty": 1})
+    assert resp.status_code == 422
 
 
 def test_manual_order_rejected_when_it_would_breach_max_exposure(api_client):
