@@ -118,7 +118,7 @@ export default function GlobalGlobe({
         />
 
         <EffectComposer multisampling={0}>
-          <Bloom mipmapBlur luminanceThreshold={0.92} luminanceSmoothing={0.15} intensity={0.35} radius={0.4} />
+          <Bloom mipmapBlur luminanceThreshold={0.97} luminanceSmoothing={0.1} intensity={0.3} radius={0.15} />
           <Vignette eskil={false} offset={0.15} darkness={0.55} />
         </EffectComposer>
       </Canvas>

@@ -2,57 +2,63 @@
 
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Trail } from "@react-three/drei";
 import * as THREE from "three";
 
-// Two thin tilted rings suggesting satellite orbits — decorative, but kept
-// subtle (low opacity, well outside the atmosphere shell) so they read as
-// tactical-display chrome rather than competing with the planet itself.
-interface RingConfig {
+/**
+ * Two small satellites orbiting the globe, each dragging a short glowing
+ * trail behind it — suggests satellite-tracking chrome without a static
+ * ring. An earlier version drew a full torus for each orbit, but a thin
+ * ring on a fixed tilt combined with the camera's horizontal-only
+ * auto-rotate orbit (constant elevation) means the viewing angle relative
+ * to the ring's plane never swings through a genuinely face-on range —
+ * it foreshortens toward a line for most of every rotation, reading as a
+ * stray streak across open space rather than a ring around the planet.
+ * A moving point's trail has no such failure mode: it's always a short,
+ * bounded arc trailing a dot, never a persistent full-circle line, so it
+ * can't foreshorten into anything that reads as broken.
+ */
+interface OrbitConfig {
   radiusScale: number;
   tilt: [number, number, number];
   color: string;
-  spin: number;
-  satelliteSpeed: number;
-  satellitePhase: number;
+  speed: number;
+  phase: number;
 }
 
-const RINGS: RingConfig[] = [
-  { radiusScale: 1.55, tilt: [0.55, 0, 0.12], color: "#D8B36C", spin: 0.035, satelliteSpeed: 0.5, satellitePhase: 0 },
-  { radiusScale: 1.85, tilt: [-0.32, 0, 0.78], color: "#5B8DEF", spin: -0.02, satelliteSpeed: -0.35, satellitePhase: 2.4 },
+const ORBITS: OrbitConfig[] = [
+  { radiusScale: 1.4, tilt: [0.55, 0, 0.12], color: "#D8B36C", speed: 0.22, phase: 0 },
+  { radiusScale: 1.55, tilt: [-0.32, 0, 0.78], color: "#5B8DEF", speed: -0.16, phase: 2.4 },
 ];
 
-function Ring({ config, baseRadius }: { config: RingConfig; baseRadius: number }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const satRef = useRef<THREE.Mesh>(null);
+function Satellite({ config, baseRadius }: { config: OrbitConfig; baseRadius: number }) {
+  const meshRef = useRef<THREE.Mesh>(null);
   const r = baseRadius * config.radiusScale;
+  const tiltQuat = useRef(new THREE.Quaternion().setFromEuler(new THREE.Euler(...config.tilt)));
+  const pos = useRef(new THREE.Vector3());
 
-  useFrame((state, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += config.spin * delta;
-    if (satRef.current) {
-      const t = state.clock.getElapsedTime() * config.satelliteSpeed + config.satellitePhase;
-      satRef.current.position.set(Math.cos(t) * r, 0, Math.sin(t) * r);
-    }
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.getElapsedTime() * config.speed + config.phase;
+    pos.current.set(Math.cos(t) * r, 0, Math.sin(t) * r).applyQuaternion(tiltQuat.current);
+    meshRef.current.position.copy(pos.current);
   });
 
   return (
-    <group ref={groupRef} rotation={config.tilt}>
-      <mesh>
-        <torusGeometry args={[r, 0.005, 8, 160]} />
-        <meshBasicMaterial color={config.color} transparent opacity={0.3} toneMapped={false} />
-      </mesh>
-      <mesh ref={satRef}>
-        <sphereGeometry args={[0.018, 8, 8]} />
+    <Trail width={1.3} length={6} color={config.color} attenuation={(w) => w} decay={1}>
+      <mesh ref={meshRef}>
+        <sphereGeometry args={[0.02, 8, 8]} />
         <meshBasicMaterial color={config.color} toneMapped={false} />
       </mesh>
-    </group>
+    </Trail>
   );
 }
 
 export default function OrbitRings({ radius = 2.2 }: { radius?: number }) {
   return (
     <>
-      {RINGS.map((cfg, i) => (
-        <Ring key={i} config={cfg} baseRadius={radius} />
+      {ORBITS.map((cfg, i) => (
+        <Satellite key={i} config={cfg} baseRadius={radius} />
       ))}
     </>
   );

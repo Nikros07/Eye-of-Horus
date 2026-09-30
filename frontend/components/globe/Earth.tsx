@@ -67,8 +67,8 @@ void main() {
   float water = texture2D(specularTexture, vUv).r;
   vec3 halfVec = normalize(sun + vViewDir);
   float specAngle = max(dot(vNormal, halfVec), 0.0);
-  float specular = pow(specAngle, 220.0) * water * max(sunFactor, 0.0);
-  color += vec3(0.9, 0.95, 1.0) * specular * 0.3;
+  float specular = pow(specAngle, 400.0) * water * max(sunFactor, 0.0);
+  color += vec3(0.9, 0.95, 1.0) * specular * 0.12;
 
   float rim = pow(1.0 - max(dot(vNormal, vViewDir), 0.0), 2.5);
   color += vec3(0.35, 0.5, 0.85) * rim * 0.15;
