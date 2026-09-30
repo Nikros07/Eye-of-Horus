@@ -87,6 +87,14 @@ def test_manual_order_rejects_non_positive_qty(api_client):
     assert resp.status_code == 422
 
 
+def test_manual_order_rejects_invalid_side(api_client):
+    """PaperBroker treats anything other than exactly "buy" as a sell, so
+    an unvalidated side would let a typo silently execute the opposite
+    side instead of failing loudly."""
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "purchase", "qty": 1})
+    assert resp.status_code == 422
+
+
 def test_kill_switch_blocks_manual_order(api_client):
     """The kill switch must block every order path, not just signal-driven
     execution — a manual click bypassing it entirely (as the /api/trading/orders

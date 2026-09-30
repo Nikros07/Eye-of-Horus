@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -30,7 +32,10 @@ class ModeChangeRequest(BaseModel):
 
 class ManualOrderRequest(BaseModel):
     asset_symbol: str
-    side: str  # buy / sell
+    # PaperBroker treats anything that isn't exactly "buy" as a sell
+    # (`sign = 1 if side == "buy" else -1`), so an unvalidated str let a
+    # typo silently execute the opposite side instead of failing loudly.
+    side: Literal["buy", "sell"]
     qty: float = Field(gt=0)
 
 
