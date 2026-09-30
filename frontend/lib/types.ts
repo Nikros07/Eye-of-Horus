@@ -201,6 +201,14 @@ export interface BacktestResult {
   created_at: string;
 }
 
+export interface CompareResult {
+  strategy: string;
+  metrics: Record<string, number | null>;
+  signal_stats: Record<string, unknown>;
+  look_ahead_bias_detected: boolean;
+  error: string | null;
+}
+
 export interface StrategyInfo {
   name: string;
   version: string;

@@ -72,7 +72,10 @@ export const api = {
     }),
   listBacktests: () => request<import("./types").BacktestResult[]>("/api/backtests"),
   compareStrategies: (strategies: string[]) =>
-    request<any[]>("/api/backtests/compare", { method: "POST", body: JSON.stringify({ strategies }) }),
+    request<import("./types").CompareResult[]>("/api/backtests/compare", {
+      method: "POST",
+      body: JSON.stringify({ strategies }),
+    }),
 
   replay: (asOf: string) => request<any>(`/api/replay?as_of=${encodeURIComponent(asOf)}`),
 
