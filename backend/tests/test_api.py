@@ -73,6 +73,49 @@ def test_system_status_reports_demo_sources(api_client):
     assert all(s["is_demo"] for s in body["data_sources"])
 
 
+def test_kill_switch_blocks_manual_order(api_client):
+    """The kill switch must block every order path, not just signal-driven
+    execution — a manual click bypassing it entirely (as the /api/trading/orders
+    endpoint previously did, calling the broker directly instead of going
+    through RiskEngine.check_order) would defeat the whole point of a kill
+    switch."""
+    activate = api_client.post("/api/risk/kill-switch", params={"active": True})
+    assert activate.status_code == 200
+    assert activate.json()["kill_switch_active"] is True
+
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 1})
+    assert resp.status_code == 403
+    assert "Kill switch" in resp.json()["detail"]
+
+
+def test_kill_switch_blocks_position_close(api_client):
+    """Same guarantee as above for closing an existing position — it must
+    still be gated by RiskEngine.check_order, not sent straight to the
+    broker."""
+    deactivate = api_client.post("/api/risk/kill-switch", params={"active": False})
+    assert deactivate.status_code == 200
+
+    opened = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 1})
+    assert opened.status_code == 200
+    assert opened.json()["status"] == "filled"
+
+    api_client.post("/api/risk/kill-switch", params={"active": True})
+
+    resp = api_client.post("/api/trading/positions/CL=F/close")
+    assert resp.status_code == 403
+    assert "Kill switch" in resp.json()["detail"]
+
+
+def test_manual_order_rejected_when_it_would_breach_max_exposure(api_client):
+    """RiskEngine.check_order's exposure limit must apply to a manual order
+    exactly like it applies to a signal-driven one."""
+    api_client.put("/api/risk", json={"max_portfolio_exposure_pct": 0.0001})
+
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 100})
+    assert resp.status_code == 403
+    assert "exposure" in resp.json()["detail"]
+
+
 def test_research_endpoint_never_fabricates_beyond_insufficient_evidence(api_client):
     events = api_client.get("/api/events").json()
     resp = api_client.get(f"/api/research/events/{events[0]['event_id']}")
