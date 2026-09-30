@@ -103,7 +103,18 @@ class PaperBroker(BrokerAdapter):
         fill_price = mid * (1 + ((SPREAD_BPS + SLIPPAGE_BPS) / 10_000) * sign)
         fees = request.qty * fill_price * (FEE_BPS / 10_000)
 
-        existing = next((p for p in self.portfolio.positions if p.asset_id == asset.id and p.closed_at is None), None)
+        # Queried directly rather than scanned from self.portfolio.positions:
+        # that relationship collection is cached in memory once loaded, so a
+        # position opened earlier in this same session (e.g. an already-flushed
+        # but uncommitted buy from a prior signal in the same auto-trade cycle)
+        # would not show up in it, and a second buy of the same asset would
+        # silently open a duplicate Position instead of adding to the existing
+        # one — reproduced in test_two_buys_of_the_same_asset_in_one_session_merge_into_one_position.
+        existing = (
+            self.db.query(Position)
+            .filter(Position.portfolio_id == self.portfolio.id, Position.asset_id == asset.id, Position.closed_at.is_(None))
+            .one_or_none()
+        )
 
         if request.side == "buy":
             cost = request.qty * fill_price + fees
@@ -175,7 +186,12 @@ class PaperBroker(BrokerAdapter):
         asset = self.db.query(Asset).filter(Asset.symbol == asset_symbol).one_or_none()
         if asset is None:
             return None
-        position = next((p for p in self.portfolio.positions if p.asset_id == asset.id and p.closed_at is None), None)
+        # Same direct-query reasoning as place_order() above.
+        position = (
+            self.db.query(Position)
+            .filter(Position.portfolio_id == self.portfolio.id, Position.asset_id == asset.id, Position.closed_at.is_(None))
+            .one_or_none()
+        )
         if position is None:
             return None
         return self.place_order(OrderRequest(asset_symbol=asset_symbol, side="sell", qty=position.qty))
