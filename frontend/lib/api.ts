@@ -72,9 +72,12 @@ export const api = {
     }),
   listBacktests: () => request<import("./types").BacktestResult[]>("/api/backtests"),
   compareStrategies: (strategies: string[]) =>
-    request<any[]>("/api/backtests/compare", { method: "POST", body: JSON.stringify({ strategies }) }),
+    request<import("./types").BacktestResult[]>("/api/backtests/compare", {
+      method: "POST",
+      body: JSON.stringify({ strategies }),
+    }),
 
-  replay: (asOf: string) => request<any>(`/api/replay?as_of=${encodeURIComponent(asOf)}`),
+  replay: (asOf: string) => request<import("./types").ReplayResult>(`/api/replay?as_of=${encodeURIComponent(asOf)}`),
 
   tradingMode: () => request<{ mode: string; live_trading_enabled: boolean }>("/api/trading/mode"),
   setTradingMode: (mode: string) =>
@@ -87,19 +90,27 @@ export const api = {
     }),
   account: () => request<{ cash: number; equity: number; buying_power: number; mode: string }>("/api/trading/account"),
   positions: () => request<import("./types").Position[]>("/api/trading/positions"),
-  orders: () => request<any[]>("/api/trading/orders"),
+  orders: () => request<import("./types").OrderInfo[]>("/api/trading/orders"),
   placeOrder: (asset_symbol: string, side: string, qty: number) =>
-    request<any>("/api/trading/orders", { method: "POST", body: JSON.stringify({ asset_symbol, side, qty }) }),
+    request<import("./types").OrderInfo>("/api/trading/orders", {
+      method: "POST",
+      body: JSON.stringify({ asset_symbol, side, qty }),
+    }),
   executeSignal: (signalId: string) =>
-    request<any>(`/api/trading/orders/execute-signal/${signalId}`, { method: "POST" }),
-  closePosition: (symbol: string) => request<any>(`/api/trading/positions/${symbol}/close`, { method: "POST" }),
+    request<{ approved: boolean; reason: string; order: import("./types").OrderInfo | null }>(
+      `/api/trading/orders/execute-signal/${signalId}`,
+      { method: "POST" }
+    ),
+  closePosition: (symbol: string) =>
+    request<import("./types").OrderInfo>(`/api/trading/positions/${symbol}/close`, { method: "POST" }),
 
   portfolio: () => request<import("./types").PortfolioSummary>("/api/portfolio"),
   portfolioTrades: () => request<import("./types").Trade[]>("/api/portfolio/trades"),
-  portfolioPerformance: () => request<any>("/api/portfolio/performance"),
+  portfolioPerformance: () => request<import("./types").PortfolioPerformance>("/api/portfolio/performance"),
 
   risk: () => request<import("./types").RiskSnapshot>("/api/risk"),
-  setKillSwitch: (active: boolean) => request<any>(`/api/risk/kill-switch?active=${active}`, { method: "POST" }),
+  setKillSwitch: (active: boolean) =>
+    request<{ kill_switch_active: boolean }>(`/api/risk/kill-switch?active=${active}`, { method: "POST" }),
 
   alerts: (params: { severity?: string; asset_symbol?: string; hours?: number; limit?: number } = {}) =>
     request<import("./types").Alert[]>(`/api/alerts${toQuery(params)}`),

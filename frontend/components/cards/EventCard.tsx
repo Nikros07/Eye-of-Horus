@@ -4,15 +4,8 @@ import Link from "next/link";
 import clsx from "clsx";
 import Card3D from "./Card3D";
 import DemoDataBadge from "../common/DemoDataBadge";
-import { formatConfidence, relativeTime, severityBg, severityColor, titleCase } from "@/lib/format";
+import { formatConfidence, relativeTime, severityColor, titleCase, verificationStyle } from "@/lib/format";
 import type { EventSummary } from "@/lib/types";
-
-const verificationStyle: Record<string, string> = {
-  verified: "border-gold/30 bg-gold/10 text-gold-bright",
-  pending: "border-info/30 bg-info/10 text-info-bright",
-  unverified: "border-white/10 bg-white/5 text-text-secondary",
-  disputed: "border-danger/30 bg-danger/10 text-danger-bright",
-};
 
 export default function EventCard({ event }: { event: EventSummary }) {
   const topAsset = Object.entries(event.market_exposure || {}).sort((a, b) => b[1] - a[1])[0];

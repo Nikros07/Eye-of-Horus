@@ -100,6 +100,36 @@ def test_backtest_detects_look_ahead_bias_when_price_data_is_future_dated(db_ses
     assert "LOOK-AHEAD BIAS DETECTED" in result.error
 
 
+def test_replay_context_excludes_future_historical_analogues(db_session):
+    """Regression test: build_context_for_event's historical_analogue_count
+    must never count events of the same type that had not yet happened (by
+    availability_time) at the simulated `as_of` — replay.py reuses this
+    context builder with an arbitrary past `as_of`, and this count feeds
+    directly into MultiSignalStrategy's confidence score, so an unfiltered
+    count is look-ahead bias."""
+    from app.models.event import Event
+    from app.services.signal_engine.generator import build_context_for_event
+
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    earlier = Event(
+        event_id="EVT-EARLIER", event_type="flood", title="Earlier flood",
+        timestamp=base, lat=0.0, lon=0.0, availability_time=base,
+    )
+    later = Event(
+        event_id="EVT-LATER", event_type="flood", title="Later flood",
+        timestamp=base + timedelta(days=10), lat=0.0, lon=0.0,
+        availability_time=base + timedelta(days=10),
+    )
+    db_session.add_all([earlier, later])
+    db_session.commit()
+
+    ctx_at_earlier = build_context_for_event(db_session, earlier, as_of=base)
+    assert ctx_at_earlier.historical_analogue_count == 0
+
+    ctx_after_both = build_context_for_event(db_session, earlier, as_of=base + timedelta(days=20))
+    assert ctx_after_both.historical_analogue_count == 1
+
+
 def test_demo_price_generation_is_deterministic():
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
     end = start + timedelta(hours=48)

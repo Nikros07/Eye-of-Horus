@@ -40,6 +40,17 @@ def test_run_and_store_backtest_persists_row(db_session):
     assert isinstance(row.trades, list)
 
 
+def test_run_and_store_backtest_marks_unknown_strategy_as_failed(db_session):
+    """Regression test: a backtest that errors out (any error, not just a
+    look-ahead bias violation) must be persisted with status="failed", not
+    silently marked "completed" with empty results."""
+    ensure_demo_data_seeded()
+    row = run_and_store_backtest(db_session, _params("does_not_exist"))
+    db_session.commit()
+    assert row.status == "failed"
+    assert row.error is not None
+
+
 def test_baseline_is_included_in_strategy_comparison(db_session):
     ensure_demo_data_seeded()
     rows = compare_strategies(db_session, ["multi_signal", "baseline_trend"], _params("multi_signal"))

@@ -43,19 +43,3 @@ class MarketSource(ABC):
 
     def get_price(self, symbol: str) -> float:
         return self.get_quote(symbol).price
-
-    def get_volume(self, symbol: str) -> float:
-        history = self.get_history(symbol, start=_days_ago(2), end=_now())
-        return history[-1].volume if history else 0.0
-
-
-def _now() -> datetime:
-    from datetime import timezone
-
-    return datetime.now(timezone.utc)
-
-
-def _days_ago(n: int) -> datetime:
-    from datetime import timedelta
-
-    return _now() - timedelta(days=n)

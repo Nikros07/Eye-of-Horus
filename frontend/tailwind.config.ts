@@ -23,6 +23,7 @@ const config: Config = {
           primary: "#E9ECF2",
           secondary: "#9AA3B2",
           tertiary: "#5D6674",
+          faint: "#454C59",
         },
         gold: {
           DEFAULT: "#D8B36C",
