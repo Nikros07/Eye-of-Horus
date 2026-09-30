@@ -74,7 +74,7 @@ export default function DashboardPage() {
   }, [liveTick]);
 
   const topEvents = (events || []).slice().sort((a, b) => b.confidence - a.confidence).slice(0, 6);
-  const featuredAssets = (assets || []).slice(0, 6);
+  const featuredAssets = assets || [];
 
   return (
     <div className="mx-auto max-w-[1600px] px-6 pb-24 pt-6">
@@ -146,6 +146,16 @@ export default function DashboardPage() {
                 </span>
               </div>
             ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border pt-4 text-[11px]">
+            <div>
+              <div className="uppercase tracking-wider text-text-tertiary">Events</div>
+              <div className="mono-num mt-0.5 font-semibold text-text-primary">{status?.totals.events ?? "—"}</div>
+            </div>
+            <div>
+              <div className="uppercase tracking-wider text-text-tertiary">Signals</div>
+              <div className="mono-num mt-0.5 font-semibold text-text-primary">{status?.totals.signals ?? "—"}</div>
+            </div>
           </div>
         </div>
       </div>

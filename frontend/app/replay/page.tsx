@@ -121,7 +121,7 @@ export default function ReplayPage() {
               What Did The System Know Then? ({data.known_events.length} events)
             </h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {data.known_events.map((event: any) => (
+              {data.known_events.map((event) => (
                 <EventCard key={event.event_id} event={event} />
               ))}
               {data.known_events.length === 0 && (
@@ -140,7 +140,7 @@ export default function ReplayPage() {
               <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-[13px]">
                 <tbody>
-                  {data.would_have_generated_signals.map((s: any, i: number) => (
+                  {data.would_have_generated_signals.map((s, i) => (
                     <tr key={i} className={i !== 0 ? "border-t border-border" : ""}>
                       <td className="px-4 py-3 font-semibold text-text-primary">{s.asset_symbol}</td>
                       <td className="px-4 py-3">

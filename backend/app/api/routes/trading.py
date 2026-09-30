@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_main_portfolio
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.models.signal import Signal
@@ -12,13 +13,6 @@ from app.services.trading_engine.broker_base import BrokerAdapter, OrderRequest
 from app.services.trading_engine.service import execute_signal, get_broker_for_portfolio
 
 router = APIRouter()
-
-
-def _get_portfolio(db: Session) -> Portfolio:
-    portfolio = db.query(Portfolio).filter(Portfolio.name == "Main Portfolio").one_or_none()
-    if portfolio is None:
-        raise HTTPException(404, "No portfolio found — startup seeding may not have completed yet.")
-    return portfolio
 
 
 def _get_broker(db: Session, portfolio: Portfolio) -> BrokerAdapter:
@@ -35,7 +29,7 @@ class ModeChangeRequest(BaseModel):
 class ManualOrderRequest(BaseModel):
     asset_symbol: str
     side: str  # buy / sell
-    qty: float
+    qty: float = Field(gt=0)
 
 
 class AutoTradeRequest(BaseModel):
@@ -45,7 +39,7 @@ class AutoTradeRequest(BaseModel):
 
 @router.get("/mode")
 def get_mode(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     settings = get_settings()
     return {"mode": portfolio.mode, "live_trading_enabled": settings.live_trading_enabled}
 
@@ -59,7 +53,7 @@ def set_mode(req: ModeChangeRequest, db: Session = Depends(get_db)):
     if req.mode == "live" and not settings.live_trading_enabled:
         raise HTTPException(403, "Live trading is disabled at the platform level (LIVE_TRADING_ENABLED=false). DO NOT PLACE ORDER.")
 
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     portfolio.mode = req.mode
     db.commit()
     return {"mode": portfolio.mode}
@@ -67,13 +61,13 @@ def set_mode(req: ModeChangeRequest, db: Session = Depends(get_db)):
 
 @router.get("/auto-trade")
 def get_auto_trade(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     return {"enabled": portfolio.auto_trade_enabled, "min_confidence": portfolio.auto_trade_min_confidence}
 
 
 @router.post("/auto-trade")
 def set_auto_trade(req: AutoTradeRequest, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     if portfolio.mode == "research" and req.enabled:
         raise HTTPException(403, "Portfolio is in RESEARCH mode — switch to paper (or live) before enabling auto-trade.")
     portfolio.auto_trade_enabled = req.enabled
@@ -87,7 +81,7 @@ def set_auto_trade(req: AutoTradeRequest, db: Session = Depends(get_db)):
 
 @router.get("/account")
 def get_account(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     broker = _get_broker(db, portfolio)
     account = broker.get_account()
     return {"cash": account.cash, "equity": account.equity, "buying_power": account.buying_power, "mode": account.mode}
@@ -95,21 +89,21 @@ def get_account(db: Session = Depends(get_db)):
 
 @router.get("/positions")
 def get_positions(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     broker = _get_broker(db, portfolio)
     return [p.__dict__ for p in broker.get_positions()]
 
 
 @router.get("/orders")
 def get_orders(db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     broker = _get_broker(db, portfolio)
     return [{**o.__dict__, "submitted_at": o.submitted_at.isoformat()} for o in broker.get_orders()]
 
 
 @router.post("/orders")
 def place_manual_order(req: ManualOrderRequest, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     if portfolio.mode == "research":
         raise HTTPException(403, "Portfolio is in RESEARCH mode — no orders are placed.")
     broker = _get_broker(db, portfolio)
@@ -120,7 +114,7 @@ def place_manual_order(req: ManualOrderRequest, db: Session = Depends(get_db)):
 
 @router.post("/orders/execute-signal/{signal_id}")
 def execute_signal_order(signal_id: str, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     signal = db.query(Signal).filter(Signal.signal_id == signal_id).one_or_none()
     if signal is None:
         raise HTTPException(404, "Signal not found")
@@ -135,7 +129,7 @@ def execute_signal_order(signal_id: str, db: Session = Depends(get_db)):
 
 @router.post("/positions/{symbol}/close")
 def close_position(symbol: str, db: Session = Depends(get_db)):
-    portfolio = _get_portfolio(db)
+    portfolio = get_main_portfolio(db)
     broker = _get_broker(db, portfolio)
     order = broker.close_position(symbol)
     db.commit()

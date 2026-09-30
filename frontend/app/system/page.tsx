@@ -5,14 +5,7 @@ import clsx from "clsx";
 import { api } from "@/lib/api";
 import Toggle from "@/components/common/Toggle";
 import { Skeleton, SkeletonCard } from "@/components/common/Skeleton";
-import { formatCompactCurrency, relativeTime } from "@/lib/format";
-
-// Risk limits and current exposure are magnitudes, not signed deltas — a
-// leading "+" (as lib/format's `formatPercent` adds for gains) would read as
-// if a 10% position-size cap were somehow a gain.
-function pct(value: number, digits = 0): string {
-  return `${(value * 100).toFixed(digits)}%`;
-}
+import { formatCompactCurrency, formatRatio, relativeTime } from "@/lib/format";
 
 const statusStyle: Record<string, string> = {
   online: "border-gold/40 bg-gold/10 text-gold-bright",
@@ -159,24 +152,23 @@ export default function SystemPage() {
                 {risk.kill_switch_active ? "Trading Halted" : "Trading Live"}
               </div>
 
-              {concentration.length > 0 && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Position Concentration</div>
-                  <div className="mt-2.5 space-y-2">
-                    {concentration.map(([symbol, weight]) => (
-                      <div key={symbol}>
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-text-secondary">{symbol}</span>
-                          <span className="mono-num text-text-tertiary">{pct(weight, 0)}</span>
-                        </div>
-                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                          <div className="h-full rounded-full bg-signal" style={{ width: `${Math.max(weight * 100, 2)}%` }} />
-                        </div>
+              <div className="mt-5 border-t border-border pt-4">
+                <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Position Concentration</div>
+                <div className="mt-2.5 space-y-2">
+                  {concentration.map(([symbol, weight]) => (
+                    <div key={symbol}>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-text-secondary">{symbol}</span>
+                        <span className="mono-num text-text-tertiary">{formatRatio(weight, 0)}</span>
                       </div>
-                    ))}
-                  </div>
+                      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                        <div className="h-full rounded-full bg-signal" style={{ width: `${Math.max(weight * 100, 2)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                  {concentration.length === 0 && <p className="text-[12px] text-text-tertiary">No open exposure.</p>}
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Current exposure vs configured limits */}
@@ -187,13 +179,13 @@ export default function SystemPage() {
                   label="Portfolio exposure"
                   current={risk.current.exposure_pct}
                   limit={risk.limits.max_portfolio_exposure_pct}
-                  format={(v) => pct(v, 0)}
+                  format={(v) => formatRatio(v, 0)}
                 />
                 <LimitBar
                   label="Current drawdown"
                   current={risk.current.current_drawdown_pct}
                   limit={risk.limits.max_drawdown_pct}
-                  format={(v) => pct(v, 1)}
+                  format={(v) => formatRatio(v, 1)}
                 />
               </div>
 
@@ -231,18 +223,18 @@ export default function SystemPage() {
               <div className="mt-5 border-t border-border pt-4">
                 <div className="text-[10px] uppercase tracking-wider text-text-tertiary">Configured Limits</div>
                 <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-3">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-text-tertiary">Max position size</span>
-                    <span className="mono-num text-text-secondary">{pct(risk.limits.max_position_size_pct, 0)}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-text-tertiary">Max daily loss</span>
-                    <span className="mono-num text-text-secondary">{pct(risk.limits.max_daily_loss_pct, 0)}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-text-tertiary">Max trades/day</span>
-                    <span className="mono-num text-text-secondary">{risk.limits.max_trades_per_day}</span>
-                  </div>
+                  {[
+                    ["Max position size", formatRatio(risk.limits.max_position_size_pct, 0)],
+                    ["Max daily loss", formatRatio(risk.limits.max_daily_loss_pct, 0)],
+                    ["Max portfolio exposure", formatRatio(risk.limits.max_portfolio_exposure_pct, 0)],
+                    ["Max drawdown", formatRatio(risk.limits.max_drawdown_pct, 0)],
+                    ["Max trades/day", String(risk.limits.max_trades_per_day)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-3">
+                      <span className="text-text-tertiary">{label}</span>
+                      <span className="mono-num text-text-secondary">{value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

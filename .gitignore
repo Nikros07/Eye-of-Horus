@@ -24,6 +24,9 @@ CLAUDE.md
 .vscode/
 .idea/
 
+# Claude Code session tooling (worktrees, etc.) — never project content
+.claude/
+
 # Logs
 *.log
 npm-debug.log*

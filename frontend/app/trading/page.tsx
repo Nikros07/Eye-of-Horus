@@ -43,7 +43,7 @@ export default function TradingPage() {
       setFeedback(res.status === "filled" ? `Filled at $${res.filled_price?.toFixed(2)}` : res.status);
       mutate("positions-trading");
       mutate("account-trading");
-    } catch (e: any) {
+    } catch {
       setFeedback("Order rejected");
     } finally {
       setPlacing(false);

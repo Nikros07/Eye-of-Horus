@@ -29,7 +29,7 @@ from app.services.market_engine.base import Bar
 from app.services.quant_engine.metrics import TradeResult, compute_metrics
 from app.services.quant_engine.temporal import LookAheadBiasError, TemporalGuard
 from app.services.signal_engine.registry import get_strategy
-from app.services.signal_engine.strategy_base import StrategyContext
+from app.services.signal_engine.strategy_base import StrategyContext, confidence_scaled_notional
 
 
 @dataclass
@@ -65,15 +65,6 @@ def _parse_horizon_hours(horizon: str) -> float:
     lo = float(match.group(1))
     hi = float(match.group(2)) if match.group(2) else lo
     return (lo + hi) / 2
-
-
-def _position_size(confidence: float, capital: float, max_position_pct: float) -> float:
-    # Proportional to the strategy's own confidence output. Strategies
-    # already gate candidate generation on their own minimum-confidence
-    # thresholds before a candidate ever reaches here, so a second,
-    # differently-calibrated floor (e.g. "confidence must exceed 0.5") would
-    # silently zero out perfectly valid lower-conviction signals.
-    return capital * max_position_pct * max(confidence, 0.0)
 
 
 def _load_bars(db: Session, asset: Asset, start: datetime, end: datetime) -> list[PriceBar]:
@@ -189,7 +180,7 @@ def run_backtest(db: Session, params: BacktestParams) -> BacktestResult:
                 exit_slippage_mult = 1 - (params.slippage_bps / 10_000) * sign
                 exit_price = exit_bar.close * exit_slippage_mult
 
-                notional = _position_size(candidate.confidence, params.initial_capital, params.max_position_pct)
+                notional = confidence_scaled_notional(candidate.confidence, params.initial_capital, params.max_position_pct)
                 if notional <= 0 or entry_price <= 0:
                     continue
                 qty = notional / entry_price

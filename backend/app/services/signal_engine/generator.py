@@ -53,7 +53,16 @@ def build_context_for_event(db: Session, event: Event, as_of: datetime | None = 
     price_history = {
         link.asset_symbol: load_price_series(db, link.asset_symbol, as_of) for link in event.impact_links
     }
-    analogue_count = db.query(Event).filter(Event.event_type == event.event_type, Event.id != event.id).count()
+    # Must match the backtester's own analogue-count filter: replay.py
+    # reuses this context builder with an arbitrary past `as_of`, and
+    # without the availability_time bound this would count analogues that
+    # hadn't happened yet at that simulated instant — look-ahead bias fed
+    # straight into MultiSignalStrategy's confidence score.
+    analogue_count = (
+        db.query(Event)
+        .filter(Event.event_type == event.event_type, Event.id != event.id, Event.availability_time <= as_of)
+        .count()
+    )
     return StrategyContext(
         as_of=as_of,
         event=event,
