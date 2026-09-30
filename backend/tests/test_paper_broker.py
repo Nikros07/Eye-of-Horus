@@ -45,6 +45,25 @@ def test_buy_exceeding_cash_is_rejected(db_session):
     assert order.status.startswith("rejected")
 
 
+def test_two_buys_of_the_same_asset_in_one_session_merge_into_one_position(db_session):
+    """Regression test: within a single db session — exactly what happens
+    when the auto-trade cycle executes several signals for the same asset
+    back-to-back with no commit in between — a second buy of an asset
+    already held must add to the existing position, not silently open a
+    second, duplicate Position row because the existing-position lookup
+    used the ORM's cached `portfolio.positions` collection, which does not
+    see a position added earlier in the very same session/flush."""
+    portfolio, broker = _setup(db_session)
+
+    broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=10))
+    broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=5))
+    db_session.commit()
+
+    positions = broker.get_positions()
+    assert len(positions) == 1
+    assert positions[0].qty == 15
+
+
 def test_close_position_realizes_pnl(db_session):
     _, broker = _setup(db_session)
     broker.place_order(OrderRequest(asset_symbol="CL=F", side="buy", qty=10))

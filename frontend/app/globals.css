@@ -28,6 +28,20 @@ body {
   color: #fff;
 }
 
+/* Keyboard-navigation focus ring — interactive elements previously relied on
+   hover-only affordances with no visible :focus state at all. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="switch"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(234, 203, 140, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Thin, unobtrusive scrollbars matching the terminal aesthetic */
 ::-webkit-scrollbar {
   width: 8px;
@@ -76,4 +90,22 @@ body {
 
 .animate-fade-in-up {
   animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.skeleton {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.045) 30%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.045) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: rgba(255, 255, 255, 0.05);
+  }
 }
