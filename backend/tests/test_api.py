@@ -43,6 +43,15 @@ def test_backtest_run_rejects_unknown_strategy(api_client):
     assert resp.status_code == 400
 
 
+def test_compare_rejects_empty_strategy_list_instead_of_500(api_client):
+    """An empty `strategies` list used to reach req.strategies[0] unchecked
+    and raise an unhandled IndexError (a raw 500), instead of the clean
+    4xx every other bad-input case on this endpoint gets."""
+    resp = api_client.post("/api/backtests/compare", json={"strategies": []})
+    assert resp.status_code == 400
+    assert "non-empty" in resp.json()["detail"]
+
+
 def test_trading_mode_defaults_to_paper(api_client):
     resp = api_client.get("/api/trading/mode")
     assert resp.status_code == 200
