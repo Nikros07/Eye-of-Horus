@@ -43,6 +43,15 @@ def test_backtest_run_rejects_unknown_strategy(api_client):
     assert resp.status_code == 400
 
 
+def test_compare_rejects_empty_strategy_list_instead_of_500(api_client):
+    """An empty `strategies` list used to reach req.strategies[0] unchecked
+    and raise an unhandled IndexError (a raw 500), instead of the clean
+    4xx every other bad-input case on this endpoint gets."""
+    resp = api_client.post("/api/backtests/compare", json={"strategies": []})
+    assert resp.status_code == 400
+    assert "non-empty" in resp.json()["detail"]
+
+
 def test_trading_mode_defaults_to_paper(api_client):
     resp = api_client.get("/api/trading/mode")
     assert resp.status_code == 200
@@ -76,6 +85,49 @@ def test_system_status_reports_demo_sources(api_client):
 def test_manual_order_rejects_non_positive_qty(api_client):
     resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": -10})
     assert resp.status_code == 422
+
+
+def test_kill_switch_blocks_manual_order(api_client):
+    """The kill switch must block every order path, not just signal-driven
+    execution — a manual click bypassing it entirely (as the /api/trading/orders
+    endpoint previously did, calling the broker directly instead of going
+    through RiskEngine.check_order) would defeat the whole point of a kill
+    switch."""
+    activate = api_client.post("/api/risk/kill-switch", params={"active": True})
+    assert activate.status_code == 200
+    assert activate.json()["kill_switch_active"] is True
+
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 1})
+    assert resp.status_code == 403
+    assert "Kill switch" in resp.json()["detail"]
+
+
+def test_kill_switch_blocks_position_close(api_client):
+    """Same guarantee as above for closing an existing position — it must
+    still be gated by RiskEngine.check_order, not sent straight to the
+    broker."""
+    deactivate = api_client.post("/api/risk/kill-switch", params={"active": False})
+    assert deactivate.status_code == 200
+
+    opened = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 1})
+    assert opened.status_code == 200
+    assert opened.json()["status"] == "filled"
+
+    api_client.post("/api/risk/kill-switch", params={"active": True})
+
+    resp = api_client.post("/api/trading/positions/CL=F/close")
+    assert resp.status_code == 403
+    assert "Kill switch" in resp.json()["detail"]
+
+
+def test_manual_order_rejected_when_it_would_breach_max_exposure(api_client):
+    """RiskEngine.check_order's exposure limit must apply to a manual order
+    exactly like it applies to a signal-driven one."""
+    api_client.put("/api/risk", json={"max_portfolio_exposure_pct": 0.0001})
+
+    resp = api_client.post("/api/trading/orders", json={"asset_symbol": "CL=F", "side": "buy", "qty": 100})
+    assert resp.status_code == 403
+    assert "exposure" in resp.json()["detail"]
 
 
 def test_risk_limit_update_rejects_a_negative_daily_loss_pct(api_client):

@@ -9,7 +9,9 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.models.signal import Signal
 from app.models.trading import Portfolio
+from app.services.market_engine.factory import get_market_source
 from app.services.trading_engine.broker_base import BrokerAdapter, OrderRequest
+from app.services.trading_engine.risk_engine import check_order
 from app.services.trading_engine.service import execute_signal, get_broker_for_portfolio
 
 router = APIRouter()
@@ -106,8 +108,25 @@ def place_manual_order(req: ManualOrderRequest, db: Session = Depends(get_db)):
     portfolio = get_main_portfolio(db)
     if portfolio.mode == "research":
         raise HTTPException(403, "Portfolio is in RESEARCH mode — no orders are placed.")
+
+    # A manual order is still an order: it must clear the same RiskEngine
+    # gate (kill switch, exposure, drawdown, daily-loss, cooldown) that
+    # execute_signal() applies to a signal-driven one. Placing it straight
+    # on the broker, as this endpoint previously did, let a manual click
+    # bypass the kill switch and every other limit entirely.
+    market_source = get_market_source()
+    price_lookup = lambda sym: market_source.get_quote(sym).price  # noqa: E731
+    try:
+        current_price = price_lookup(req.asset_symbol)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"Could not fetch quote for {req.asset_symbol}: {exc}") from exc
+
+    check = check_order(db, portfolio, req.asset_symbol, req.side, req.qty * current_price, current_price, price_lookup)
+    if not check.approved:
+        raise HTTPException(403, check.reason)
+
     broker = _get_broker(db, portfolio)
-    order = broker.place_order(OrderRequest(asset_symbol=req.asset_symbol, side=req.side, qty=req.qty))
+    order = broker.place_order(OrderRequest(asset_symbol=req.asset_symbol, side=req.side, qty=check.approved_qty))
     db.commit()
     return {**order.__dict__, "submitted_at": order.submitted_at.isoformat()}
 
@@ -130,6 +149,23 @@ def execute_signal_order(signal_id: str, db: Session = Depends(get_db)):
 @router.post("/positions/{symbol}/close")
 def close_position(symbol: str, db: Session = Depends(get_db)):
     portfolio = get_main_portfolio(db)
+    position = next(
+        (p for p in portfolio.positions if p.asset.symbol == symbol and p.closed_at is None),
+        None,
+    )
+    if position is None:
+        raise HTTPException(404, "No open position for this symbol")
+
+    # Same RiskEngine gate as place_manual_order — closing a position is
+    # still an order the broker executes, and previously skipped the kill
+    # switch (and every other limit) entirely.
+    market_source = get_market_source()
+    price_lookup = lambda sym: market_source.get_quote(sym).price  # noqa: E731
+    current_price = price_lookup(symbol)
+    check = check_order(db, portfolio, symbol, "sell", position.qty * current_price, current_price, price_lookup)
+    if not check.approved:
+        raise HTTPException(403, check.reason)
+
     broker = _get_broker(db, portfolio)
     order = broker.close_position(symbol)
     db.commit()

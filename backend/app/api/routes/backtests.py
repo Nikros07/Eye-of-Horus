@@ -101,6 +101,9 @@ def get_backtest(backtest_id: int, db: Session = Depends(get_db)):
 
 @router.post("/compare")
 def compare(req: CompareRequest, db: Session = Depends(get_db)):
+    if not req.strategies:
+        raise HTTPException(400, "strategies must be a non-empty list")
+
     unknown = [s for s in req.strategies if s not in STRATEGY_REGISTRY]
     if unknown:
         raise HTTPException(400, f"Unknown strategies: {unknown}")
