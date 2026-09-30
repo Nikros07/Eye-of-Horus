@@ -26,14 +26,14 @@ export default function EquityCurveChart({ data, height = 280 }: { data: Point[]
           dataKey="ts"
           tickFormatter={(v) => new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           stroke="rgba(255,255,255,0.15)"
-          tick={{ fill: "#5D6674", fontSize: 10 }}
+          tick={{ fill: "#7C8598", fontSize: 10 }}
           tickLine={false}
           axisLine={false}
           minTickGap={40}
         />
         <YAxis
           stroke="rgba(255,255,255,0.15)"
-          tick={{ fill: "#5D6674", fontSize: 10 }}
+          tick={{ fill: "#7C8598", fontSize: 10 }}
           tickLine={false}
           axisLine={false}
           tickFormatter={(v) => formatCompactCurrency(v)}

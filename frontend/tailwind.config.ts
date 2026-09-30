@@ -22,7 +22,16 @@ const config: Config = {
         text: {
           primary: "#E9ECF2",
           secondary: "#9AA3B2",
-          tertiary: "#5D6674",
+          // Lightened from #5D6674 (~3.5:1 on the app background, below the
+          // 4.5:1 WCAG AA floor for normal text) to ~5.3:1 — this token is
+          // used for uppercase labels and meta text everywhere, so it was
+          // the single highest-impact contrast fix in the app.
+          tertiary: "#7C8598",
+          // Was referenced as `text-text-faint` in AlertTicker but never
+          // defined here, so Tailwind silently dropped the class and those
+          // three spots rendered in the inherited (bright) text-primary
+          // color instead of the intended subdued tone.
+          faint: "#59626E",
         },
         gold: {
           DEFAULT: "#D8B36C",
