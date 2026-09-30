@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import clsx from "clsx";
 import { api } from "@/lib/api";
 import EventCard from "@/components/cards/EventCard";
 import SignalBadge from "@/components/cards/SignalBadge";
+import { Skeleton, SkeletonCard, SkeletonRow } from "@/components/common/Skeleton";
 import { titleCase } from "@/lib/format";
 
 function isoLocalNow(offsetDays = 0): string {
@@ -13,11 +15,25 @@ function isoLocalNow(offsetDays = 0): string {
   return d.toISOString().slice(0, 16);
 }
 
+const PRESETS = [
+  { label: "2h ago", offsetDays: 2 / 24 },
+  { label: "24h ago", offsetDays: 1 },
+  { label: "3d ago", offsetDays: 3 },
+  { label: "7d ago", offsetDays: 7 },
+  { label: "30d ago", offsetDays: 30 },
+];
+
 export default function ReplayPage() {
   const [asOf, setAsOf] = useState(isoLocalNow(2));
   const [query, setQuery] = useState<string | null>(null);
 
   const { data, isLoading } = useSWR(query ? ["replay", query] : null, () => api.replay(query as string));
+
+  function applyPreset(offsetDays: number) {
+    const next = isoLocalNow(offsetDays);
+    setAsOf(next);
+    setQuery(new Date(next).toISOString());
+  }
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 pb-24 pt-8">
@@ -27,28 +43,78 @@ export default function ReplayPage() {
         availability_time is ever shown here.
       </p>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border glass p-5">
-        <div>
-          <label className="text-[11px] uppercase tracking-wider text-text-tertiary">As of</label>
-          <input
-            type="datetime-local"
-            value={asOf}
-            onChange={(e) => setAsOf(e.target.value)}
-            className="mt-1.5 rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-[13px] mono-num text-text-primary outline-none focus:border-gold/40"
-          />
+      <div className="mt-6 rounded-2xl border border-border glass p-5">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="text-[11px] uppercase tracking-wider text-text-tertiary">As of</label>
+            <input
+              type="datetime-local"
+              value={asOf}
+              onChange={(e) => setAsOf(e.target.value)}
+              className="mt-1.5 rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-[13px] mono-num text-text-primary outline-none focus:border-gold/40"
+            />
+          </div>
+          <button
+            onClick={() => setQuery(new Date(asOf).toISOString())}
+            className="rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-[13px] font-semibold text-gold-bright transition-colors hover:bg-gold/20"
+          >
+            Replay
+          </button>
+          {data && <span className="text-[11px] text-text-tertiary">{data.note}</span>}
         </div>
-        <button
-          onClick={() => setQuery(new Date(asOf).toISOString())}
-          className="rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-[13px] font-semibold text-gold-bright transition-colors hover:bg-gold/20"
-        >
-          Replay
-        </button>
-        {data && <span className="text-[11px] text-text-tertiary">{data.note}</span>}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+          <span className="text-[11px] uppercase tracking-wider text-text-tertiary">Quick jump</span>
+          {PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => applyPreset(p.offsetDays)}
+              className="rounded-full border border-border px-3 py-1 text-[11px] font-medium text-text-secondary transition-colors hover:border-gold/40 hover:text-gold-bright"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {isLoading && <p className="mt-8 text-[13px] text-text-tertiary">Reconstructing point-in-time state…</p>}
+      {isLoading && (
+        <div className="mt-8 space-y-10">
+          <div>
+            <Skeleton className="mb-4 h-3 w-72" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={i} className="h-[176px]" />
+              ))}
+            </div>
+          </div>
+          <div>
+            <Skeleton className="mb-4 h-3 w-64" />
+            <div className="overflow-hidden rounded-2xl border border-border glass">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-[13px]">
+                <tbody>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <SkeletonRow key={i} cols={4} />
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {data && (
+      {!query && !isLoading && (
+        <div className="mt-8 flex h-[320px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-center text-[13px] text-text-tertiary">
+          <p>Pick a moment above — or use Quick jump — to see exactly what the system had observed by then.</p>
+          <p className="max-w-md text-[12px] text-text-tertiary/70">
+            Every event, evidence item and signal carries an availability_time; replay filters strictly on it, so
+            this view can never leak information from the future relative to the point you chose.
+          </p>
+        </div>
+      )}
+
+      {data && !isLoading && (
         <div className="mt-8 space-y-10">
           <div>
             <h2 className="mb-4 text-[12px] font-semibold uppercase tracking-[0.18em] text-text-tertiary">
@@ -71,7 +137,8 @@ export default function ReplayPage() {
               Signals The System Would Have Generated
             </h2>
             <div className="overflow-hidden rounded-2xl border border-border glass">
-              <table className="w-full text-[13px]">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-[13px]">
                 <tbody>
                   {data.would_have_generated_signals.map((s, i) => (
                     <tr key={i} className={i !== 0 ? "border-t border-border" : ""}>
@@ -92,6 +159,7 @@ export default function ReplayPage() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         </div>

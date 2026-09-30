@@ -36,6 +36,10 @@ class ManualOrderRequest(BaseModel):
     # (`sign = 1 if side == "buy" else -1`), so an unvalidated str let a
     # typo silently execute the opposite side instead of failing loudly.
     side: Literal["buy", "sell"]
+    # A negative or zero qty reached the broker unchecked: for a "buy" it
+    # made cost negative, so `cost > portfolio.cash` never rejected it and
+    # `cash -= cost` *added* cash while opening a negative position — a free
+    # money and free short-position exploit. gt=0 closes it at the boundary.
     qty: float = Field(gt=0)
 
 

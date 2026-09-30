@@ -71,8 +71,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
   listBacktests: () => request<import("./types").BacktestResult[]>("/api/backtests"),
+  // The backend's compare endpoint returns {strategy, metrics, signal_stats,
+  // look_ahead_bias_detected, error} per strategy — not a full stored
+  // Backtest row (no id/equity_curve/created_at), hence CompareResult and
+  // not BacktestResult here.
   compareStrategies: (strategies: string[]) =>
-    request<import("./types").BacktestResult[]>("/api/backtests/compare", {
+    request<import("./types").CompareResult[]>("/api/backtests/compare", {
       method: "POST",
       body: JSON.stringify({ strategies }),
     }),

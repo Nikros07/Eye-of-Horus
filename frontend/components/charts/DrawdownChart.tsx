@@ -27,7 +27,7 @@ export default function DrawdownChart({ data, height = 140 }: { data: Point[]; h
         <XAxis dataKey="ts" hide />
         <YAxis
           stroke="rgba(255,255,255,0.15)"
-          tick={{ fill: "#5D6674", fontSize: 10 }}
+          tick={{ fill: "#7C8598", fontSize: 10 }}
           tickLine={false}
           axisLine={false}
           tickFormatter={(v) => `${v.toFixed(0)}%`}
