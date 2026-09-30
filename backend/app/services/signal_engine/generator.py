@@ -53,7 +53,21 @@ def build_context_for_event(db: Session, event: Event, as_of: datetime | None = 
     price_history = {
         link.asset_symbol: load_price_series(db, link.asset_symbol, as_of) for link in event.impact_links
     }
-    analogue_count = db.query(Event).filter(Event.event_type == event.event_type, Event.id != event.id).count()
+    # Must mirror the backtester's analogue-count filter (see backtester.py):
+    # an analogue event that only became known after `as_of` cannot have been
+    # part of the system's knowledge at that instant. This matters for live
+    # generation too (as_of defaults to "now", where it's a no-op) but is
+    # essential for the /api/replay caller, which passes a past `as_of` and
+    # promises no data whose availability_time is after it is ever used.
+    analogue_count = (
+        db.query(Event)
+        .filter(
+            Event.event_type == event.event_type,
+            Event.id != event.id,
+            Event.availability_time <= as_of,
+        )
+        .count()
+    )
     return StrategyContext(
         as_of=as_of,
         event=event,
