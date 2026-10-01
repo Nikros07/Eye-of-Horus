@@ -1,10 +1,16 @@
 """Pluggable LLM backend for the research layer.
 
-Without an ANTHROPIC_API_KEY, `get_llm_provider()` returns None and callers
-fall back to the deterministic synthesizer — the system must work, and must
-never fabricate evidence, either way. With a key, ClaudeProvider is used,
-but it is still given only the structured EvidenceBundle and an explicit
-instruction to answer INSUFFICIENT EVIDENCE rather than invent facts.
+Without a configured provider key, `get_llm_provider()` returns None and
+callers fall back to the deterministic synthesizer — the system must work,
+and must never fabricate evidence, either way. With a key, the configured
+provider is used, but it is still given only the structured EvidenceBundle
+and an explicit instruction to answer INSUFFICIENT EVIDENCE rather than
+invent facts.
+
+LLM_PROVIDER selects which one: "anthropic" (default, needs
+ANTHROPIC_API_KEY) or "gemini" (needs GEMINI_API_KEY — Google AI Studio
+issues a free-tier key with no card required). Both implement the same
+LLMProvider interface, so synthesizer.py never knows which is active.
 """
 from __future__ import annotations
 
@@ -29,11 +35,17 @@ Rules you must follow exactly:
 
 
 class LLMProvider(ABC):
+    # One of "claude" / "gemini" — ResearchOutput.source is set to this on
+    # a successful synthesis, so the frontend can show which model answered.
+    source_label: str
+
     @abstractmethod
     def synthesize(self, evidence_bundle: dict) -> dict | None: ...
 
 
 class ClaudeProvider(LLMProvider):
+    source_label = "claude"
+
     def __init__(self, api_key: str) -> None:
         import anthropic
 
@@ -53,11 +65,52 @@ class ClaudeProvider(LLMProvider):
             return None
 
 
+class GeminiProvider(LLMProvider):
+    """Calls Google's Gemini API directly over REST (no extra SDK
+    dependency — same approach as the NASA EONET/Open-Meteo connectors),
+    asking for a JSON response via `responseMimeType` so the same parsing
+    path as ClaudeProvider works unchanged.
+    """
+
+    source_label = "gemini"
+
+    def __init__(self, api_key: str, model: str) -> None:
+        self._api_key = api_key
+        self._model = model
+
+    def synthesize(self, evidence_bundle: dict) -> dict | None:
+        import httpx
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self._model}:generateContent"
+        body = {
+            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "contents": [{"role": "user", "parts": [{"text": json.dumps(evidence_bundle)}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+        try:
+            with httpx.Client(timeout=20.0) as client:
+                resp = client.post(url, params={"key": self._api_key}, json=body)
+                resp.raise_for_status()
+                payload = resp.json()
+        except httpx.HTTPError:
+            return None
+
+        try:
+            text = payload["candidates"][0]["content"]["parts"][0]["text"]
+            return json.loads(text)
+        except (KeyError, IndexError, json.JSONDecodeError):
+            return None
+
+
 def get_llm_provider() -> LLMProvider | None:
     settings = get_settings()
-    if not settings.anthropic_api_key:
-        return None
     try:
+        if settings.llm_provider == "gemini":
+            if not settings.gemini_api_key:
+                return None
+            return GeminiProvider(settings.gemini_api_key, settings.gemini_model)
+        if not settings.anthropic_api_key:
+            return None
         return ClaudeProvider(settings.anthropic_api_key)
     except Exception:  # noqa: BLE001
         return None

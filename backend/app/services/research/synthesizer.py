@@ -24,7 +24,7 @@ class ResearchOutput:
     invalidation: list[str] = field(default_factory=list)
     market_already_priced: str = "NO"  # NO / POSSIBLY / YES
     historical_analogues: str = "INSUFFICIENT EVIDENCE"
-    source: str = "deterministic"  # deterministic | claude
+    source: str = "deterministic"  # deterministic | claude | gemini
 
 
 def synthesize_research(bundle: EvidenceBundle) -> ResearchOutput:
@@ -42,7 +42,7 @@ def synthesize_research(bundle: EvidenceBundle) -> ResearchOutput:
                     invalidation=raw.get("invalidation", []),
                     market_already_priced=raw.get("market_already_priced", "NO"),
                     historical_analogues=raw.get("historical_analogues", "INSUFFICIENT EVIDENCE"),
-                    source="claude",
+                    source=provider.source_label,
                 )
             except Exception:  # noqa: BLE001
                 pass  # fall through to deterministic synthesis
