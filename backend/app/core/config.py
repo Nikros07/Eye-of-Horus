@@ -30,6 +30,16 @@ class Settings(BaseSettings):
 
     default_paper_capital: float = 10_000.0
 
+    # internal = PaperBroker simulates fills in-process against our own
+    # ledger (default, zero setup). alpaca = AlpacaBroker submits real
+    # orders to Alpaca's free paper-trading account (real fills/market data,
+    # still fake money) — requires ALPACA_API_KEY/ALPACA_SECRET_KEY below.
+    # Only ever affects portfolio.mode == "paper"; "live" mode is untouched
+    # and still always resolves to the deliberately-unconfigured LiveBroker.
+    broker_provider: Literal["internal", "alpaca"] = "internal"
+    alpaca_api_key: str | None = None
+    alpaca_secret_key: str | None = None
+
     # AI research layer. Without a key the system falls back to the
     # deterministic evidence synthesizer (never fabricates facts either way).
     anthropic_api_key: str | None = None

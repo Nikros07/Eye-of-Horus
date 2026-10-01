@@ -99,6 +99,33 @@ find with zero live data. That drift is a demonstration of the event→price mec
 the platform is built to detect — **not** a claim of real predictive edge. In live
 mode, prices come from Yahoo Finance with no synthetic signal baked in.
 
+### Real paper-trading execution (optional, still fake money)
+
+By default, paper trades are simulated in-process (`PaperBroker`): no external
+dependency, instant fills, spread/slippage modeled with simple constants. Setting
+`BROKER_PROVIDER=alpaca` plus `ALPACA_API_KEY`/`ALPACA_SECRET_KEY` (free, no card —
+see below) switches the **paper** portfolio to `AlpacaBroker`, which submits real
+orders to [Alpaca](https://alpaca.markets)'s own paper-trading account instead: real
+order matching, real market data, a real brokerage ledger you can also check in
+Alpaca's own dashboard — still zero real money, since it only ever talks to Alpaca's
+paper endpoint. This is a config change for the *paper* portfolio only; `live` mode is
+completely unaffected and still always resolves to `LiveBroker`
+(`app/services/trading_engine/live_broker.py`), which deliberately refuses to place
+any order until a real broker integration is written into that file on purpose.
+
+**Getting free Alpaca paper-trading keys:**
+1. Sign up at [alpaca.markets](https://alpaca.markets) (free, no credit card for
+   paper trading).
+2. In the dashboard, make sure you're viewing **Paper Trading** (not Live), then open
+   **API Keys** and generate a key pair.
+3. Set `BROKER_PROVIDER=alpaca`, `ALPACA_API_KEY`, and `ALPACA_SECRET_KEY` (Render:
+   dashboard → environment; local: `backend/.env`).
+
+If the keys are missing or wrong, `AlpacaBroker` refuses to construct with a clear
+`AlpacaNotConfiguredError` (surfaced as an HTTP 403, same pattern as the live-trading
+safety stub) rather than silently falling back — nothing is ever auto-downgraded to a
+different broker without telling you.
+
 ## Quickstart
 
 **Docker Compose** (fastest — no local Python/Node needed):
@@ -170,6 +197,8 @@ highlights:
 | `DATA_MODE` | `demo` | No — `live` enables real NASA/Open-Meteo connectors |
 | `MARKET_DATA_PROVIDER` | `demo` | No — `yfinance` enables real market data |
 | `LIVE_TRADING_ENABLED` | `false` | No — paper trading needs nothing else |
+| `BROKER_PROVIDER` | `internal` | No — `alpaca` routes paper trades through a real Alpaca paper account |
+| `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` | unset | Only if `BROKER_PROVIDER=alpaca` |
 | `ANTHROPIC_API_KEY` | unset | No — falls back to a deterministic evidence synthesizer |
 | `DATABASE_URL` | bundled SQLite | No — set for Postgres in production |
 | `NEXT_PUBLIC_API_BASE` (frontend) | `http://localhost:8000` | No — only matters once frontend and backend are hosted separately |
