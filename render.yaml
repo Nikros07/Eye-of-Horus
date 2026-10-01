@@ -63,11 +63,16 @@ services:
       # "http://localhost:3000" while developing against this backend).
       - key: CORS_ORIGINS
         value: '["https://nikros07.github.io"]'
-      # Optional. Leave unset (click "Skip" when prompted) to keep the
-      # deterministic evidence synthesizer — the research layer works
-      # fully without this. Set it only if you want the AI research layer
-      # to call the real Claude API instead.
+      # anthropic = ClaudeProvider (needs ANTHROPIC_API_KEY). gemini =
+      # GeminiProvider (needs GEMINI_API_KEY instead — free-tier key, no
+      # card required, from https://aistudio.google.com/apikey). Leave as
+      # "anthropic" (and both keys unset/"Skip") to keep the deterministic
+      # evidence synthesizer — the research layer works fully without this.
+      - key: LLM_PROVIDER
+        value: anthropic
       - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
         sync: false
       # DATABASE_URL is intentionally not set here: it defaults to the
       # bundled SQLite file, which is all the free plan's ephemeral disk

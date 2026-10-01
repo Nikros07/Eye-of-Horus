@@ -40,9 +40,15 @@ class Settings(BaseSettings):
     alpaca_api_key: str | None = None
     alpaca_secret_key: str | None = None
 
-    # AI research layer. Without a key the system falls back to the
-    # deterministic evidence synthesizer (never fabricates facts either way).
+    # AI research layer. Without a key for the selected provider the system
+    # falls back to the deterministic evidence synthesizer (never fabricates
+    # facts either way). anthropic = ClaudeProvider (needs ANTHROPIC_API_KEY).
+    # gemini = GeminiProvider (needs GEMINI_API_KEY — Google AI Studio issues
+    # a free-tier key with no card required).
+    llm_provider: Literal["anthropic", "gemini"] = "anthropic"
     anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash"
 
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 

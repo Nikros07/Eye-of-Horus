@@ -126,6 +126,20 @@ If the keys are missing or wrong, `AlpacaBroker` refuses to construct with a cle
 safety stub) rather than silently falling back — nothing is ever auto-downgraded to a
 different broker without telling you.
 
+### AI research provider: Claude or Gemini
+
+Without any key, the research layer falls back to a deterministic, template-based
+synthesizer (never invented text, just less polished prose). `ANTHROPIC_API_KEY`
+turns that on via Claude; setting `LLM_PROVIDER=gemini` + `GEMINI_API_KEY` uses
+Google's Gemini instead — both implement the same interface
+(`app/services/research/llm_provider.py`), so the rest of the app never knows which
+one answered (the research output's `source` field says `claude` or `gemini`).
+
+**Getting a free Gemini key:** sign up at
+[Google AI Studio](https://aistudio.google.com/apikey) and generate an API key — no
+credit card required for the free tier. Set `LLM_PROVIDER=gemini` and
+`GEMINI_API_KEY` (Render: dashboard → environment; local: `backend/.env`).
+
 ## Quickstart
 
 **Docker Compose** (fastest — no local Python/Node needed):
@@ -173,8 +187,10 @@ Both halves deploy free, with no credit card:
 
 `render.yaml` at the repo root describes everything — build command, start command,
 health check, and every env var already set to a demo-safe default. Nothing to fill
-in unless you want the optional `ANTHROPIC_API_KEY` for real AI research synthesis.
-The free plan spins down after ~15 min idle (cold start on the next request) and has
+in unless you want real AI research synthesis instead of the deterministic fallback —
+either `ANTHROPIC_API_KEY`, or `LLM_PROVIDER=gemini` + `GEMINI_API_KEY` for a free
+Gemini key from [Google AI Studio](https://aistudio.google.com/apikey) (no card
+required) instead of Claude. The free plan spins down after ~15 min idle (cold start on the next request) and has
 an ephemeral filesystem — harmless here since the app reseeds its own demo data on
 every startup.
 
@@ -199,7 +215,9 @@ highlights:
 | `LIVE_TRADING_ENABLED` | `false` | No — paper trading needs nothing else |
 | `BROKER_PROVIDER` | `internal` | No — `alpaca` routes paper trades through a real Alpaca paper account |
 | `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` | unset | Only if `BROKER_PROVIDER=alpaca` |
+| `LLM_PROVIDER` | `anthropic` | No — `gemini` uses Gemini instead of Claude for AI research |
 | `ANTHROPIC_API_KEY` | unset | No — falls back to a deterministic evidence synthesizer |
+| `GEMINI_API_KEY` | unset | Only if `LLM_PROVIDER=gemini` |
 | `DATABASE_URL` | bundled SQLite | No — set for Postgres in production |
 | `NEXT_PUBLIC_API_BASE` (frontend) | `http://localhost:8000` | No — only matters once frontend and backend are hosted separately |
 
