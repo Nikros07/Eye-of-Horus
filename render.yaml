@@ -42,6 +42,21 @@ services:
         value: "10000"
       - key: INGESTION_INTERVAL_SECONDS
         value: "300"
+      # internal = PaperBroker simulates fills in-process (default, zero
+      # setup). alpaca = real orders against Alpaca's free PAPER trading
+      # account (still fake money) — only takes effect once both keys
+      # below are also set. Leave as-is to keep the zero-setup default.
+      - key: BROKER_PROVIDER
+        value: internal
+      # Optional. Leave unset (click "Skip") unless you want paper trades
+      # to execute against a real (free, fake-money) Alpaca paper account
+      # instead of the built-in simulator — get keys free at
+      # alpaca.markets (dashboard -> Paper Trading -> API Keys), then also
+      # set BROKER_PROVIDER=alpaca above.
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_SECRET_KEY
+        sync: false
       # The deployed GitHub Pages origin — update if you fork/rename the
       # repo, or add your own frontend's origin here (comma-separated
       # entries inside the JSON list below, e.g. also

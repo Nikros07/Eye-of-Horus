@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.signal import Signal
 from app.models.trading import Portfolio
 from app.services.market_engine.factory import get_market_source
@@ -26,11 +27,15 @@ class TradeDecision:
 
 
 def get_broker_for_portfolio(db: Session, portfolio: Portfolio) -> BrokerAdapter:
-    market_source = get_market_source()
     if portfolio.mode == "live":
         from app.services.trading_engine.live_broker import LiveBroker
 
         return LiveBroker()
+    if get_settings().broker_provider == "alpaca":
+        from app.services.trading_engine.alpaca_broker import AlpacaBroker
+
+        return AlpacaBroker(db, portfolio)
+    market_source = get_market_source()
     return PaperBroker(db, portfolio, market_source)
 
 
