@@ -5,12 +5,34 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.event import Event
 from app.models.market import Asset, PriceBar
 from app.models.system import DataSource
+from app.services.market_engine.base import Bar, MarketSource
 from app.services.market_engine.demo_adapter import DEMO_ASSETS, HISTORY_DAYS, generate_history
 
 _UTCNOW = lambda: datetime.now(timezone.utc)  # noqa: E731
+
+
+def _aware(dt: datetime) -> datetime:
+    """SQLite round-trips DateTime(timezone=True) columns as naive; normalize
+    defensively before comparing a DB-loaded timestamp against datetime.now()."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def run_price_ingestion(db: Session) -> None:
+    """Single entry point the bootstrap seed and the scheduler both call:
+    keeps PriceBar populated regardless of which market data mode is active,
+    so neither caller needs to know which provider is behind it."""
+    settings = get_settings()
+    if settings.data_mode == "demo":
+        seed_demo_price_history(db)
+        return
+
+    from app.services.market_engine.factory import get_market_source
+
+    sync_live_price_history(db, get_market_source())
 
 
 def ensure_assets(db: Session) -> dict[str, Asset]:
@@ -77,3 +99,62 @@ def _direction_for(event: Event, symbol: str) -> str:
         if rule.asset_symbol == symbol:
             return rule.direction
     return "bullish"
+
+
+def _price_bar_row(asset_id: int, bar: Bar, market_source: MarketSource) -> PriceBar:
+    return PriceBar(
+        asset_id=asset_id,
+        ts=bar.ts,
+        open=bar.open,
+        high=bar.high,
+        low=bar.low,
+        close=bar.close,
+        volume=bar.volume,
+        source=market_source.name,
+        availability_time=bar.ts,
+        is_demo=market_source.is_demo,
+    )
+
+
+def sync_live_price_history(db: Session, market_source: MarketSource, now: datetime | None = None) -> None:
+    """Keeps PriceBar current from a real MarketSource (yfinance). Unlike
+    seed_demo_price_history this is not a one-time seed: it is meant to run
+    on every ingestion cycle so prices stay fresh. A rate-limited or failing
+    symbol only degrades that one symbol — it never blocks the others or the
+    ingestion cycle calling this.
+    """
+    now = now or _UTCNOW()
+    start = time.monotonic()
+    assets = ensure_assets(db)
+    ok_count = 0
+    last_error: str | None = None
+
+    for symbol, asset in assets.items():
+        try:
+            latest = db.query(PriceBar).filter(PriceBar.asset_id == asset.id).order_by(PriceBar.ts.desc()).first()
+            if latest is None:
+                backfill_start = now - timedelta(days=HISTORY_DAYS)
+                bars = market_source.get_history(symbol, backfill_start, now, interval="1h")
+                for bar in bars:
+                    db.add(_price_bar_row(asset.id, bar, market_source))
+                db.flush()
+            elif _aware(latest.ts) <= now - timedelta(minutes=1):
+                quote = market_source.get_quote(symbol)
+                bar = Bar(ts=quote.ts, open=quote.price, high=quote.price, low=quote.price, close=quote.price, volume=0.0)
+                db.add(_price_bar_row(asset.id, bar, market_source))
+                db.flush()
+            ok_count += 1
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"{symbol}: {exc}"
+
+    source = db.query(DataSource).filter(DataSource.name == market_source.name).one_or_none()
+    if source is None:
+        source = DataSource(name=market_source.name, kind="market", is_demo=market_source.is_demo)
+        db.add(source)
+    source.is_demo = market_source.is_demo
+    source.status = "online" if (ok_count > 0 and last_error is None) else ("degraded" if ok_count > 0 else "offline")
+    if ok_count > 0:
+        source.last_success_at = _UTCNOW()
+    source.last_error = last_error
+    source.latency_ms = (time.monotonic() - start) * 1000
+    db.flush()

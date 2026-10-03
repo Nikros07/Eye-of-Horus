@@ -1,7 +1,7 @@
-"""Idempotent startup seeding: ingest events, build impact links, seed demo
-price history, generate signals, and ensure a default paper portfolio
-exists. Safe to call on every startup — everything here is a no-op once
-data already exists.
+"""Idempotent startup seeding: ingest events, build impact links, sync price
+history (demo or live, see market_engine.ingest.run_price_ingestion),
+generate signals, and ensure a default paper portfolio exists. Safe to call
+on every startup — everything here is a no-op once data already exists.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from app.models.event import Event
 from app.models.trading import Portfolio
 from app.services.event_engine.ingest import run_event_ingestion
 from app.services.impact_engine.graph import build_impact_links
-from app.services.market_engine.ingest import seed_demo_price_history
+from app.services.market_engine.ingest import run_price_ingestion
 from app.services.signal_engine.generator import generate_signals_for_event
 
 logger = logging.getLogger("eye_of_horus")
@@ -34,9 +34,8 @@ def ensure_demo_data_seeded() -> None:
         else:
             events = db.query(Event).all()
 
-        if settings.data_mode == "demo":
-            seed_demo_price_history(db)
-            db.commit()
+        run_price_ingestion(db)
+        db.commit()
 
         for event in events:
             generate_signals_for_event(db, event)
@@ -49,6 +48,12 @@ def ensure_demo_data_seeded() -> None:
                 mode="paper",
                 cash=settings.default_paper_capital,
                 initial_capital=settings.default_paper_capital,
+                # The whole point of this portfolio is to demonstrate the
+                # scheduler's automated event -> signal -> trade loop, so it
+                # starts live rather than requiring a manual opt-in click
+                # that a fresh deploy's ephemeral SQLite file would silently
+                # lose on the next restart. Still 100% paper money either way.
+                auto_trade_enabled=True,
             )
             db.add(default_portfolio)
             db.commit()

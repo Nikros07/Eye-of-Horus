@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.services.event_engine.ingest import run_event_ingestion
 from app.services.impact_engine.graph import build_impact_links
+from app.services.market_engine.ingest import run_price_ingestion
 from app.services.signal_engine.generator import generate_signals_for_event
 from app.services.trading_engine.auto_trade import run_auto_trade_cycle
 
@@ -31,6 +32,8 @@ def _run_ingestion_cycle() -> None:
         db.commit()
         for event in events:
             build_impact_links(db, event)
+        db.commit()
+        run_price_ingestion(db)
         db.commit()
         for event in events:
             generate_signals_for_event(db, event)
