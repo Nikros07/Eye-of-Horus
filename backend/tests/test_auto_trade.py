@@ -5,10 +5,17 @@ from app.services.bootstrap import ensure_demo_data_seeded
 from app.services.trading_engine.auto_trade import run_auto_trade_cycle, run_auto_trade_for_portfolio
 
 
-def test_auto_trade_disabled_by_default_does_nothing(db_session):
+def test_bootstrap_seeds_main_portfolio_with_auto_trade_enabled(db_session):
     ensure_demo_data_seeded()
     portfolio = db_session.query(Portfolio).filter(Portfolio.name == "Main Portfolio").one()
-    assert portfolio.auto_trade_enabled is False
+    assert portfolio.auto_trade_enabled is True
+
+
+def test_disabled_portfolio_does_nothing(db_session):
+    ensure_demo_data_seeded()
+    portfolio = db_session.query(Portfolio).filter(Portfolio.name == "Main Portfolio").one()
+    portfolio.auto_trade_enabled = False
+    db_session.commit()
 
     outcomes = run_auto_trade_for_portfolio(db_session, portfolio)
     assert outcomes == []

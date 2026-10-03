@@ -49,6 +49,12 @@ def ensure_demo_data_seeded() -> None:
                 mode="paper",
                 cash=settings.default_paper_capital,
                 initial_capital=settings.default_paper_capital,
+                # The whole point of this portfolio is to demonstrate the
+                # scheduler's automated event -> signal -> trade loop, so it
+                # starts live rather than requiring a manual opt-in click
+                # that a fresh deploy's ephemeral SQLite file would silently
+                # lose on the next restart. Still 100% paper money either way.
+                auto_trade_enabled=True,
             )
             db.add(default_portfolio)
             db.commit()
