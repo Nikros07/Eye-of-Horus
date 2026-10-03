@@ -99,6 +99,17 @@ find with zero live data. That drift is a demonstration of the event→price mec
 the platform is built to detect — **not** a claim of real predictive edge. In live
 mode, prices come from Yahoo Finance with no synthetic signal baked in.
 
+The deployed `render.yaml` blueprint runs `DATA_MODE=live` /
+`MARKET_DATA_PROVIDER=yfinance` by default: real NASA/weather events and real Yahoo
+Finance prices, no API key needed for either. `PriceBar` history is backfilled and
+kept fresh automatically (`app/services/market_engine/ingest.py:sync_live_price_history`),
+same as the demo seeder but pulling from the real connectors instead. The one tradeoff:
+Yahoo Finance occasionally rate-limits or blocks requests from cloud datacenter IPs,
+which can leave a symbol's price stale until the next successful fetch — handled as a
+per-symbol degradation (`DataSource.status: degraded`), never a crashed ingestion
+cycle. For a zero-network-dependency deployment instead, set both back to `demo` in
+Render's environment tab.
+
 ### Real paper-trading execution (optional, still fake money)
 
 By default, paper trades are simulated in-process (`PaperBroker`): no external

@@ -5,14 +5,27 @@
 #   2. Dashboard -> New -> Blueprint -> select the Eye-of-Horus repo.
 #   3. Render reads this file automatically and shows the plan below.
 #      Click "Apply" — that's it. No env vars need to be filled in; every
-#      one below already has a value that makes the app run in demo mode,
-#      which needs no API keys or paid services.
+#      one below already has a value, and none of it needs a paid service.
+#
+# DATA_MODE below is set to "live": real events (NASA EONET + Open-Meteo)
+# and real prices (Yahoo Finance via yfinance) — no API key needed for
+# either, but Yahoo Finance is known to rate-limit/block requests from cloud
+# datacenter IPs from time to time, which can leave a symbol's price data
+# stale until the next successful fetch (the ingestion cycle degrades that
+# one symbol gracefully rather than failing the whole cycle — see
+# backend/app/services/market_engine/ingest.py). Set both back to "demo" for
+# a 100%-reliable, zero-network-dependency deployment instead (synthetic but
+# realistic events/prices, clearly flagged is_demo: true end-to-end).
 #
 # The free plan spins the service down after ~15 minutes idle and wakes it
-# on the next request (cold start up to ~30s). The filesystem is ephemeral,
-# so the SQLite demo database resets on every redeploy/restart — harmless
-# here since the app reseeds its own demo data on startup (see
-# backend/app/services/bootstrap.py).
+# on the next request (cold start up to ~30s) — which also pauses the
+# scheduler (automated ingestion + auto-trade loop) until the next request
+# arrives. For genuinely continuous automated trading, ping the service
+# every ~10 minutes (e.g. a free https://cron-job.org job hitting
+# /api/health) to keep it from spinning down. The filesystem is ephemeral,
+# so the SQLite database resets on every redeploy/restart — harmless, since
+# the app reseeds its own demo data (and, in live mode, re-syncs real price
+# history) on startup — see backend/app/services/bootstrap.py.
 services:
   - type: web
     name: eye-of-horus-api
@@ -30,10 +43,12 @@ services:
       - key: ENVIRONMENT
         value: production
       # demo = deterministic seeded generators, no external calls, no keys.
+      # live = real connectors (NASA EONET, Open-Meteo, yfinance) — see the
+      # note above on Yahoo Finance reliability.
       - key: DATA_MODE
-        value: demo
+        value: live
       - key: MARKET_DATA_PROVIDER
-        value: demo
+        value: yfinance
       # Leave false. Live trading additionally requires a real broker
       # adapter that does not exist yet — see backend/.env.example.
       - key: LIVE_TRADING_ENABLED
