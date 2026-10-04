@@ -6,7 +6,12 @@ from types import SimpleNamespace
 from app.models.market import PriceBar
 from app.models.system import DataSource
 from app.services.market_engine.base import Bar, MarketSource, Quote
-from app.services.market_engine.ingest import ensure_assets, run_price_ingestion, sync_live_price_history
+from app.services.market_engine.ingest import (
+    MAX_SYMBOLS_PER_SYNC_CYCLE,
+    ensure_assets,
+    run_price_ingestion,
+    sync_live_price_history,
+)
 
 
 class _FakeMarketSource(MarketSource):
@@ -53,19 +58,37 @@ def _seed_one_bar_per_asset(db_session, assets, ts) -> None:
     db_session.commit()
 
 
-def test_sync_live_price_history_backfills_when_no_bars_exist(db_session):
+def test_sync_live_price_history_backfills_at_most_the_per_cycle_cap(db_session):
     source = _FakeMarketSource()
     sync_live_price_history(db_session, source)
     db_session.commit()
 
     assets = ensure_assets(db_session)
-    assert db_session.query(PriceBar).count() == 3 * len(assets)
-    assert source.history_calls == len(assets)
+    assert len(assets) > MAX_SYMBOLS_PER_SYNC_CYCLE  # otherwise this test proves nothing
+    assert db_session.query(PriceBar).count() == 3 * MAX_SYMBOLS_PER_SYNC_CYCLE
+    assert source.history_calls == MAX_SYMBOLS_PER_SYNC_CYCLE
     assert source.quote_calls == 0
 
     ds = db_session.query(DataSource).filter(DataSource.name == "FAKE_LIVE").one()
     assert ds.status == "online"
     assert ds.is_demo is False
+
+
+def test_sync_live_price_history_backfills_the_full_universe_over_several_cycles(db_session):
+    source = _FakeMarketSource()
+    assets = ensure_assets(db_session)
+    db_session.commit()
+
+    for _ in range(-(-len(assets) // MAX_SYMBOLS_PER_SYNC_CYCLE)):  # ceil division
+        sync_live_price_history(db_session, source)
+        db_session.commit()
+
+    # Every symbol backfilled exactly once — no gaps, no duplicate backfills
+    # (a symbol can additionally pick up a quote top-up once its backfilled
+    # bars are stale enough, which is correct, just not asserted here).
+    assert source.history_calls == len(assets)
+    for asset in assets.values():
+        assert db_session.query(PriceBar).filter(PriceBar.asset_id == asset.id).count() >= 3
 
 
 def test_sync_live_price_history_appends_fresh_quote_when_latest_bar_is_stale(db_session):
@@ -77,8 +100,8 @@ def test_sync_live_price_history_appends_fresh_quote_when_latest_bar_is_stale(db
     sync_live_price_history(db_session, source)
     db_session.commit()
 
-    assert db_session.query(PriceBar).count() == 2 * len(assets)
-    assert source.quote_calls == len(assets)
+    assert db_session.query(PriceBar).count() == len(assets) + MAX_SYMBOLS_PER_SYNC_CYCLE
+    assert source.quote_calls == MAX_SYMBOLS_PER_SYNC_CYCLE
     assert source.history_calls == 0
 
 

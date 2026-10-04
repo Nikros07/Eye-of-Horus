@@ -116,8 +116,20 @@ def _price_bar_row(asset_id: int, bar: Bar, market_source: MarketSource) -> Pric
     )
 
 
+# Touching every symbol in one call means up to 13 sequential external HTTP
+# calls (each allowed by yfinance's own defaults to take 10-30s) inside a
+# single open transaction. On Render's free tier that was slow/heavy enough
+# to starve the process and fail its health check (incident 2026-10-03,
+# commit 7bc03b4 -> service down ~9 min after the first live sync ran).
+# Capping and committing per-symbol bounds each call's worst case to a few
+# tens of seconds; the full universe backfills gradually over several
+# ingestion cycles instead of all at once.
+MAX_SYMBOLS_PER_SYNC_CYCLE = 3
+
+
 def sync_live_price_history(db: Session, market_source: MarketSource, now: datetime | None = None) -> None:
-    """Keeps PriceBar current from a real MarketSource (yfinance). Unlike
+    """Keeps PriceBar current from a real MarketSource (yfinance), a few
+    symbols at a time (see MAX_SYMBOLS_PER_SYNC_CYCLE). Unlike
     seed_demo_price_history this is not a one-time seed: it is meant to run
     on every ingestion cycle so prices stay fresh. A rate-limited or failing
     symbol only degrades that one symbol — it never blocks the others or the
@@ -126,25 +138,39 @@ def sync_live_price_history(db: Session, market_source: MarketSource, now: datet
     now = now or _UTCNOW()
     start = time.monotonic()
     assets = ensure_assets(db)
+    db.commit()
+
+    # Symbols with no history at all are more urgent than ones that just
+    # need a fresh quote, so they're backfilled first. needs_backfill=True
+    # marks which of the two this item is, since that's decided once here
+    # rather than re-derived per item in the loop below.
+    work: list[tuple[str, Asset, bool]] = []
+    needs_quote: list[tuple[str, Asset, bool]] = []
+    for symbol, asset in assets.items():
+        latest = db.query(PriceBar).filter(PriceBar.asset_id == asset.id).order_by(PriceBar.ts.desc()).first()
+        if latest is None:
+            work.append((symbol, asset, True))
+        elif _aware(latest.ts) <= now - timedelta(minutes=1):
+            needs_quote.append((symbol, asset, False))
+    work = (work + needs_quote)[:MAX_SYMBOLS_PER_SYNC_CYCLE]
+
     ok_count = 0
     last_error: str | None = None
-
-    for symbol, asset in assets.items():
+    for symbol, asset, needs_backfill in work:
         try:
-            latest = db.query(PriceBar).filter(PriceBar.asset_id == asset.id).order_by(PriceBar.ts.desc()).first()
-            if latest is None:
+            if needs_backfill:
                 backfill_start = now - timedelta(days=HISTORY_DAYS)
                 bars = market_source.get_history(symbol, backfill_start, now, interval="1h")
                 for bar in bars:
                     db.add(_price_bar_row(asset.id, bar, market_source))
-                db.flush()
-            elif _aware(latest.ts) <= now - timedelta(minutes=1):
+            else:
                 quote = market_source.get_quote(symbol)
                 bar = Bar(ts=quote.ts, open=quote.price, high=quote.price, low=quote.price, close=quote.price, volume=0.0)
                 db.add(_price_bar_row(asset.id, bar, market_source))
-                db.flush()
+            db.commit()
             ok_count += 1
         except Exception as exc:  # noqa: BLE001
+            db.rollback()
             last_error = f"{symbol}: {exc}"
 
     source = db.query(DataSource).filter(DataSource.name == market_source.name).one_or_none()
@@ -152,9 +178,10 @@ def sync_live_price_history(db: Session, market_source: MarketSource, now: datet
         source = DataSource(name=market_source.name, kind="market", is_demo=market_source.is_demo)
         db.add(source)
     source.is_demo = market_source.is_demo
-    source.status = "online" if (ok_count > 0 and last_error is None) else ("degraded" if ok_count > 0 else "offline")
-    if ok_count > 0:
-        source.last_success_at = _UTCNOW()
-    source.last_error = last_error
+    if work:
+        source.status = "online" if (ok_count > 0 and last_error is None) else ("degraded" if ok_count > 0 else "offline")
+        if ok_count > 0:
+            source.last_success_at = _UTCNOW()
+        source.last_error = last_error
     source.latency_ms = (time.monotonic() - start) * 1000
-    db.flush()
+    db.commit()
