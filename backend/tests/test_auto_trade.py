@@ -9,6 +9,11 @@ def test_bootstrap_seeds_main_portfolio_with_auto_trade_enabled(db_session):
     ensure_demo_data_seeded()
     portfolio = db_session.query(Portfolio).filter(Portfolio.name == "Main Portfolio").one()
     assert portfolio.auto_trade_enabled is True
+    # Deliberately below the model's own 0.6 default — see bootstrap.py for
+    # why: in live mode most signals never reach 0.6, so this is the actual
+    # bar that decides whether auto-trade ever fires on anything beyond the
+    # event-independent baseline_trend strategy.
+    assert portfolio.auto_trade_min_confidence == 0.15
 
 
 def test_disabled_portfolio_does_nothing(db_session):

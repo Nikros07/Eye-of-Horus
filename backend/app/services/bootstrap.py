@@ -54,6 +54,17 @@ def ensure_demo_data_seeded() -> None:
                 # that a fresh deploy's ephemeral SQLite file would silently
                 # lose on the next restart. Still 100% paper money either way.
                 auto_trade_enabled=True,
+                # Below the model default (0.6): in live mode most events
+                # are single-source with no second corroborating evidence
+                # stream, which caps their signal confidence well under 0.6
+                # (see app/services/event_engine/verification.py) — at 0.6,
+                # auto-trade would rarely fire on anything but the
+                # event-independent baseline_trend strategy. RiskEngine's
+                # position sizing already scales a position down toward
+                # zero as confidence drops (confidence_scaled_notional), so
+                # a low-confidence fill is automatically a small one, not an
+                # uncapped bet on a weak signal.
+                auto_trade_min_confidence=0.15,
             )
             db.add(default_portfolio)
             db.commit()
