@@ -60,9 +60,15 @@ services:
       # internal = PaperBroker simulates fills in-process (default, zero
       # setup). alpaca = real orders against Alpaca's free PAPER trading
       # account (still fake money) — only takes effect once both keys
-      # below are also set. Leave as-is to keep the zero-setup default.
+      # below are also set. sync: false (not a `value:`) because this is a
+      # per-deployment personal choice, same as the two keys below it: a
+      # `value:` here would make Render overwrite your dashboard choice
+      # back to it on every redeploy, silently switching Alpaca back off
+      # (this happened — see git history around 2026-10-22). Leave unset
+      # (click "Skip") for the zero-setup default, or set to "alpaca" once
+      # in the dashboard to opt in; it stays set across future deploys.
       - key: BROKER_PROVIDER
-        value: internal
+        sync: false
       # Optional. Leave unset (click "Skip") unless you want paper trades
       # to execute against a real (free, fake-money) Alpaca paper account
       # instead of the built-in simulator — get keys free at
@@ -80,11 +86,13 @@ services:
         value: '["https://nikros07.github.io"]'
       # anthropic = ClaudeProvider (needs ANTHROPIC_API_KEY). gemini =
       # GeminiProvider (needs GEMINI_API_KEY instead — free-tier key, no
-      # card required, from https://aistudio.google.com/apikey). Leave as
-      # "anthropic" (and both keys unset/"Skip") to keep the deterministic
-      # evidence synthesizer — the research layer works fully without this.
+      # card required, from https://aistudio.google.com/apikey). sync: false
+      # for the same reason as BROKER_PROVIDER above: a per-deployment
+      # personal choice, not something a redeploy should silently reset.
+      # Leave unset (both keys too) to keep the deterministic evidence
+      # synthesizer — the research layer works fully without this.
       - key: LLM_PROVIDER
-        value: anthropic
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: GEMINI_API_KEY
