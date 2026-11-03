@@ -6,6 +6,7 @@ from app.models.event import Event
 from app.models.system import DataSource
 from app.services.event_engine.connectors.base import RawEvent, RawEvidence
 from app.services.event_engine.connectors.demo_connector import DemoEventConnector
+from app.services.event_engine.connectors.gdacs import GdacsAlert, GdacsConnector
 from app.services.event_engine.connectors.nasa_eonet import NasaEonetConnector
 from app.services.event_engine.connectors.open_meteo import OpenMeteoConnector
 from app.services.event_engine.normalizer import upsert_event
@@ -117,6 +118,9 @@ def test_live_ingestion_corroborates_weather_sensitive_events_with_open_meteo(db
         return RawEvidence(kind="weather", source="OPEN_METEO", content="synthetic", availability_time=now)
 
     monkeypatch.setattr(OpenMeteoConnector, "fetch_current", fake_fetch_current)
+    # No GDACS alerts this cycle: isolates this test to weather corroboration
+    # only, deterministically (not "happens to be unreachable from here").
+    monkeypatch.setattr(GdacsConnector, "fetch_alerts", lambda self: [])
 
     events = ingest_module.run_event_ingestion(db_session)
     db_session.commit()
@@ -130,3 +134,38 @@ def test_live_ingestion_corroborates_weather_sensitive_events_with_open_meteo(db
     meteo_source = db_session.query(DataSource).filter(DataSource.name == "OPEN_METEO").one()
     assert meteo_source.status == "online"
     assert meteo_source.is_demo is False
+
+
+def test_live_ingestion_corroborates_any_event_type_with_matching_gdacs_alert(db_session, monkeypatch):
+    """GDACS covers earthquakes/volcanoes/etc too, unlike Open-Meteo, so a
+    single-source live earthquake can still get a second, independent
+    corroborating evidence item — the gap that left most live-mode events
+    stuck at the single-source confidence floor (0.38, see
+    verification.py), never high enough to clear a strategy's
+    MIN_CONFIDENCE gate."""
+    import app.services.event_engine.ingest as ingest_module
+
+    now = datetime.now(timezone.utc)
+    raw_earthquake = RawEvent(
+        source_event_id="EONET-3", event_type="earthquake", title="Earthquake", timestamp=now,
+        lat=12.3, lon=56.7, source="NASA_EONET", publication_time=now,
+    )
+
+    monkeypatch.setattr(ingest_module, "get_settings", lambda: type("S", (), {"data_mode": "live"})())
+    monkeypatch.setattr(NasaEonetConnector, "fetch", lambda self, since=None: [raw_earthquake])
+    monkeypatch.setattr(OpenMeteoConnector, "fetch_current", lambda self, lat, lon: None)
+    matching_alert = GdacsAlert(event_type="earthquake", lat=12.4, lon=56.8, published=now, alert_level="orange", title="GDACS EQ")
+    monkeypatch.setattr(GdacsConnector, "fetch_alerts", lambda self: [matching_alert])
+
+    events = ingest_module.run_event_ingestion(db_session)
+    db_session.commit()
+
+    assert len(events) == 1
+    event = events[0]
+    assert len(event.evidence) == 1
+    assert event.evidence[0].kind == "news"
+    assert event.evidence[0].source == "GDACS"
+    assert event.confidence > 0.38  # above the bare single-source floor
+
+    gdacs_source = db_session.query(DataSource).filter(DataSource.name == "GDACS").one()
+    assert gdacs_source.status == "online"
