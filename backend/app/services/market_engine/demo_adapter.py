@@ -30,7 +30,11 @@ DEMO_ASSETS: dict[str, dict] = {
     "XLU": {"name": "Utilities Select Sector SPDR", "asset_class": "etf", "base_price": 68.0, "vol": 0.16},
     "XLE": {"name": "Energy Select Sector SPDR", "asset_class": "etf", "base_price": 88.0, "vol": 0.24},
     "SOXX": {"name": "iShares Semiconductor ETF", "asset_class": "etf", "base_price": 210.0, "vol": 0.32},
-    "SPX": {"name": "S&P 500 Index", "asset_class": "index", "base_price": 5450.0, "vol": 0.15},
+    # Yahoo Finance's actual ticker for the S&P 500 index is "^GSPC" — "SPX"
+    # alone doesn't resolve on yfinance and would have silently degraded
+    # this one symbol forever in live mode (see sync_live_price_history's
+    # per-symbol error isolation).
+    "^GSPC": {"name": "S&P 500 Index", "asset_class": "index", "base_price": 5450.0, "vol": 0.15},
 }
 
 _SEED = 42

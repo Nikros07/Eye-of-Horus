@@ -38,7 +38,7 @@ IMPACT_RULES: dict[str, list[ImpactRule]] = {
     ],
     "earthquake": [
         ImpactRule(("EVENT", "MINE", "ORE_PRODUCTION", "COPPER"), "HG=F", 0.5, "bullish", "Seismic activity in mining regions risks output disruption."),
-        ImpactRule(("EVENT", "REGIONAL_INFRASTRUCTURE", "INSURANCE_EXPOSURE", "REINSURERS"), "SPX", 0.2, "bearish", "Large earthquakes increase insured-loss expectations."),
+        ImpactRule(("EVENT", "REGIONAL_INFRASTRUCTURE", "INSURANCE_EXPOSURE", "REINSURERS"), "^GSPC", 0.2, "bearish", "Large earthquakes increase insured-loss expectations."),
     ],
     "wildfire": [
         ImpactRule(("EVENT", "FOREST_OPERATIONS", "LUMBER_SUPPLY", "LUMBER"), "LBS=F", 0.5, "bullish", "Wildfires reduce harvestable timber and disrupt mills."),
