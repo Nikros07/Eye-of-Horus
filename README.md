@@ -88,10 +88,21 @@ a short comment explaining *why*, not just what.
 deterministic, seeded generators for events and market prices — every row is flagged
 `is_demo: true` end-to-end into the API and UI, with a visible **DEMO** badge wherever
 that data is shown. The real connectors are fully implemented
-(`app/services/event_engine/connectors/nasa_eonet.py`, `open_meteo.py`,
+(`app/services/event_engine/connectors/nasa_eonet.py`, `open_meteo.py`, `gdacs.py`,
 `app/services/market_engine/yfinance_adapter.py`) — switching to `DATA_MODE=live` and
 `MARKET_DATA_PROVIDER=yfinance` is a config change, not a rewrite, once the deployment
 environment has outbound network access to those APIs.
+
+In live mode, every NASA EONET event is cross-checked against two independent, free,
+no-key sources: Open-Meteo for weather-sensitive event types (flood, drought, extreme
+weather, wildfire, hurricane), and GDACS (Global Disaster Alert and Coordination
+System) for *any* event type GDACS also tracks — earthquakes and volcanic activity
+included, which weather data can never corroborate. A single-source live event tops
+out at confidence 0.38 (see `app/services/event_engine/verification.py`), below every
+strategy's `MIN_CONFIDENCE` gate; a second independent source reporting the same
+disaster at a similar place and time is usually enough to clear it. A connector being
+unreachable only degrades that one connector's contribution (`DataSource.status:
+degraded`) — it never blocks ingestion of the underlying event.
 
 The demo market-data generator layers a small, deterministic post-event price drift on
 top of a random walk, specifically so the Backtest Lab has something non-trivial to
@@ -221,7 +232,7 @@ highlights:
 
 | Variable | Default | Required? |
 |---|---|---|
-| `DATA_MODE` | `demo` | No — `live` enables real NASA/Open-Meteo connectors |
+| `DATA_MODE` | `demo` | No — `live` enables real NASA/Open-Meteo/GDACS connectors |
 | `MARKET_DATA_PROVIDER` | `demo` | No — `yfinance` enables real market data |
 | `LIVE_TRADING_ENABLED` | `false` | No — paper trading needs nothing else |
 | `BROKER_PROVIDER` | `internal` | No — `alpaca` routes paper trades through a real Alpaca paper account |
